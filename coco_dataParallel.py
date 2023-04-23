@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 from collections import Counter
 import math
+import os
+import time
 
 from torchvision.datasets import CocoCaptions
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
@@ -17,9 +19,11 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import nltk
 nltk.download('punkt')
+import matplotlib.pyplot as plt
+from matplotlib import style
 
 
-# In[ ]:
+# In[2]:
 
 
 image_transform = Compose([
@@ -30,7 +34,7 @@ image_transform = Compose([
 ])
 
 
-# In[ ]:
+# In[3]:
 
 
 class CaptionPreprocessor:
@@ -63,7 +67,7 @@ class CaptionPreprocessor:
         return [self.preprocess(caption) for caption in captions]
 
 
-# In[ ]:
+# In[4]:
 
 
 class CustomCocoDataset(Dataset):
@@ -81,7 +85,7 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[ ]:
+# In[5]:
 
 
 class PatchEmbedding(nn.Module):
@@ -117,7 +121,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[ ]:
+# In[6]:
 
 
 class PositionalEncoding(nn.Module):
@@ -153,7 +157,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[ ]:
+# In[7]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -186,7 +190,7 @@ class ImageCaptioningModel(nn.Module):
         return output
 
 
-# In[ ]:
+# In[8]:
 
 
 class NoamScheduler:
@@ -210,7 +214,45 @@ class NoamScheduler:
         return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
-# In[ ]:
+# In[9]:
+
+
+def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
+    plt.style.use('classic')
+
+    fig, ax = plt.subplots(figsize=(15, 6))
+    ax.plot(train_losses, label='Train Loss')
+    ax.plot(val_losses, label='Validation Loss')
+    ax.set_xlabel('Epochs', fontsize=14)
+    ax.set_ylabel('Loss', fontsize=14)
+    ax.set_title('Training and Validation Losses', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.grid()
+    ax.legend(fontsize=12)
+    fig.savefig('losses.png')
+
+    fig, ax = plt.subplots(figsize=(15, 6))
+    ax.plot(learning_rates, label='Learning Rate')
+    ax.set_xlabel('Epochs', fontsize=14)
+    ax.set_ylabel('Learning Rate', fontsize=14)
+    ax.set_title('Learning Rate Schedule', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.grid()
+    ax.legend(fontsize=12)
+    fig.savefig('learning_rates.png')
+
+    fig_ax = plt.subplots(figsize=15, 6)
+    ax.plot(max_min_loss_diffs, label='Loss Difference')
+    ax.set_xlabel('Epochs', fontsize=14)
+    ax.set_ylabel('Loss Difference', fontsize=14)
+    ax.set_title('Difference Between Max and Min Loss per Epoch', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.grid()
+    ax.legend(fontsize=12)
+    fig.savefig('loss_differences.png')
+
+
+# In[10]:
 
 
 train_dataset = CocoCaptions(root='./coco/images',
@@ -234,6 +276,45 @@ custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
 batch_size = 192
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+
+
+# In[13]:
+
+
+# print(plt.style.available)
+#
+# plt.style.use('classic')
+# # Some example data
+# epochs = list(range(1, 251))
+# train_losses = [1 / epoch for epoch in epochs]
+# val_losses = [(1 / epoch) + 0.1 for epoch in epochs]
+#
+# # Create the figure and axes with a specified figure size
+# fig, ax = plt.subplots(figsize=(15, 6))
+#
+# # Plot the training and validation losses
+# ax.plot(epochs, train_losses, label='Training Loss', color='blue')
+# ax.plot(epochs, val_losses, label='Validation Loss', color='orange')
+#
+# # Set labels and title
+# ax.set_xlabel('Epoch', fontsize=14)
+# ax.set_ylabel('Loss', fontsize=14)
+# ax.set_title('Training and Validation Losses', fontsize=16)
+#
+# # Increase the size of the tick labels
+# ax.tick_params(axis='both', which='major', labelsize=12)
+#
+# # Add a grid for better readability
+# ax.grid()
+#
+# # Add a legend
+# ax.legend(fontsize=12)
+#
+# # Save the figure
+# fig.savefig('losses_plot.png')
+#
+# # Display the plot
+# plt.show()
 
 
 # In[ ]:
@@ -268,17 +349,31 @@ optimizer = optim.Adam(model.parameters(), lr=1e-4)
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
 scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
 
-num_epochs = 10
+num_epochs = 20
 best_val_loss = float('inf')
 
+train_losses = []
+val_losses = []
+learning_rates = []
+max_min_loss_diffs = []
+save_name = ''
+
 print('**********STARTING TRAINING**********')
+training_start = time.time()
 for epoch in range(num_epochs):
+    epoch_start = time.time()
+
+    epoch_max_loss = float('-inf')
+    epoch_min_loss = float('inf')
+
     model.train()
     train_loss = 0
     total_samples = len(train_data_loader.dataset)
     batch_size = train_data_loader.batch_size
     max_iterations = math.ceil(total_samples / batch_size)
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
+
+    epoch_train_start = time.time()
     for i, (images, captions) in enumerate(train_data_loader):
         images = images.to(device)
         captions_input = captions[:, :-1].to(device)
@@ -292,14 +387,28 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         train_loss += loss.item()
+        if train_loss > epoch_max_loss:
+            epoch_max_loss = train_loss
+        if train_loss < epoch_min_loss:
+            epoch_min_loss = train_loss
 
         if i % 20 == 0:
             print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss: {loss.item()}')
+
+    epoch_train_end = time.time()
+    epoch_train_time = epoch_train_end - epoch_train_start
+    print(f'Epoch {epoch+1} training time: {epoch_train_time}')
+
+    epoch_max_min_diff = epoch_max_loss - epoch_min_loss
+    max_min_loss_diffs.append(epoch_max_min_diff)
+    print(f'Difference between max and min loss in epoch {epoch+1}: {epoch_max_min_diff}')
 
     train_loss /= len(train_data_loader)
 
     model.eval()
     val_loss = 0
+
+    epoch_val_start = time.time()
     with torch.no_grad():
         for images, captions in val_data_loader:
             images = images.to(device)
@@ -311,12 +420,34 @@ for epoch in range(num_epochs):
 
             val_loss += loss.item()
 
+    epoch_val_end = time.time()
+    epoch_val_time = epoch_val_end - epoch_val_start
+    print(f'Epoch {epoch+1} validation time: {epoch_val_time}')
+
+    epoch_end = time.time()
+    epoch_time = epoch_end - epoch_start
+    print(f'Epoch {epoch+1} total time: {epoch_time}')
+
     val_loss /= len(val_data_loader)
     print(f'Epoch: {epoch+1}/{num_epochs}, Train Loss: {train_loss}, Val Loss: {val_loss}')
+    train_losses.append(train_loss)
+    val_losses.append(val_loss)
+    learning_rates.append(optimizer.param_groups[0]['lr'])
 
     if val_loss < best_val_loss:
         best_val_loss = val_loss
-        torch.save(model.state_dict(), 'best_loss_model.pth')
+
+        if os.path.exists(save_name):
+            os.remove(save_name)
+
+        save_name = f'best_loss_model_{epoch}.pth'
+        torch.save(model.state_dict(), save_name)
 
     scheduler.step()
+
+training_end = time.time()
+training_time = training_end - training_start
+print(f'Total training time: {training_time}')
+
+plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs)
 
