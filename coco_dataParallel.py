@@ -349,7 +349,7 @@ optimizer = optim.Adam(model.parameters(), lr=1e-4)
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
 scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
 
-num_epochs = 20
+num_epochs = 250
 best_val_loss = float('inf')
 
 train_losses = []
@@ -403,7 +403,8 @@ for epoch in range(num_epochs):
     print(f'Epoch {epoch+1} training time: {epoch_train_time}')
 
     epoch_max_min_diff = epoch_max_loss - epoch_min_loss
-    max_min_loss_diffs.append(epoch_max_min_diff)
+    if epoch + 1 is not 1:
+        max_min_loss_diffs.append(epoch_max_min_diff)
     print(f'Difference between max and min loss in epoch {epoch+1}: {epoch_max_min_diff}')
 
     train_loss /= len(train_data_loader)
