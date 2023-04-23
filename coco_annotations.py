@@ -263,7 +263,7 @@ for epoch in range(num_epochs):
 
         train_loss += loss.item()
 
-        if i % 100 == 0:
+        if i % 20 == 0:
             print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss: {loss.item()}')
 
     train_loss /= len(train_data_loader)
