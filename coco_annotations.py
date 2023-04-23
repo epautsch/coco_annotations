@@ -162,7 +162,9 @@ class ImageCaptioningModel(nn.Module):
         num_patches = (224 // 16) * (224 // 16)
         image_features_flattened = image_features.permute(1, 0, 2).view(num_patches, -1, self.embedding_size)
 
-        start_token_embeddings = self.caption_decoder.embedding(torch.tensor([self.caption_decoder.embedding.num_embeddings - 2], device=device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
+        print("Start token index:", caption_preprocessor.vocab['<start>'])
+
+        start_token_embeddings = self.caption_decoder.embedding(torch.tensor([caption_preprocessor.vocab['<start>']], device=device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
         memory = torch.cat([start_token_embeddings, image_features_flattened.permute(1, 0, 2)], dim=1) # Concatenate the start token embeddings with the flattened image features
         output = self.caption_decoder(captions, memory)
         return output
@@ -214,6 +216,10 @@ for epoch in range(num_epochs):
 
         print("Captions shape:", captions_input.shape)
         print("Memory shape:", images.shape)
+
+        print("Max index in captions_input:", captions_input.max().item())
+
+        print("Embedding layer num_embeddings:", model.caption_decoder.embedding.num_embeddings)
 
         optimizer.zero_grad()
         output = model(images, captions_input)
