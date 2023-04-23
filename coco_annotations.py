@@ -165,7 +165,7 @@ class ImageCaptioningModel(nn.Module):
     def forward(self, images, captions):
         image_features = self.image_encoder(images)
         num_patches = (224 // 16) * (224 // 16)
-        image_features_flattened = image_features.permute(1, 0, 2).view(num_patches, -1, self.embedding_size)
+        image_features_flattened = image_features.permute(1, 0, 2).view(-1, num_patches, self.embedding_size)
 
         print("Start token index:", caption_preprocessor.vocab['<start>'])
 
