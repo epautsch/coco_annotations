@@ -157,11 +157,12 @@ class TransformerCaptionDecoder(nn.Module):
 
 
 class ImageCaptioningModel(nn.Module):
-    def __init__(self, image_encoder, caption_decoder, embedding_size):
+    def __init__(self, image_encoder, caption_decoder, embedding_size, start_token_index):
         super(ImageCaptioningModel, self).__init__()
         self.image_encoder = image_encoder
         self.caption_decoder = caption_decoder
         self.embedding_size = embedding_size
+        self.start_token_index = start_token_index
 
     def forward(self, images, captions):
         image_features = self.image_encoder(images)
@@ -170,7 +171,7 @@ class ImageCaptioningModel(nn.Module):
 
         # print("Start token index:", caption_preprocessor.vocab['<start>'])
 
-        start_token_embeddings = self.caption_decoder.embedding(torch.tensor([caption_preprocessor.vocab['<start>']], device=device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
+        start_token_embeddings = self.caption_decoder.embedding(torch.tensor([self.start_token_index], device=images.device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
         image_features_summed = image_features_flattened.sum(dim=1).unsqueeze(1)
         memory = torch.cat([start_token_embeddings, image_features_summed], dim=1) # Concatenate the start token embeddings with the flattened image features
 
@@ -183,6 +184,30 @@ class ImageCaptioningModel(nn.Module):
         output = output.transpose(0, 1)
 
         return output
+
+
+# In[ ]:
+
+
+class NoamScheduler:
+    def __init__(self, optimizer, d_model, warmup_steps=4000):
+        self.optimizer = optimizer
+        self.d_model = d_model
+        self.warmup_steps = warmup_steps
+        self.current_step = 0
+
+    def step(self):
+        self.current_step += 1
+        lr = self.learning_rate()
+        for param_group in self.optimizer.param_groups:
+            if param_group['lr'] != lr:
+                print(f"Learning rate changed: {param_group['lr']} -> {lr}")
+            param_group['lr'] = lr
+
+    def learning_rate(self):
+        arg1 = self.current_step ** -0.5
+        arg2 = min(self.current_step * self.warmup_steps ** -1.5, 1)
+        return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
 # In[ ]:
@@ -231,7 +256,7 @@ caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
                                             num_heads=8,
                                             mlp_dim=2048).to(device)
 embedding_size = 768
-model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size).to(device)
+model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
 
 if torch.cuda.device_count() > 1:
     print(f'Using {torch.cuda.device_count()} GPUs')
@@ -240,7 +265,8 @@ if torch.cuda.device_count() > 1:
 criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
+# scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
 
 num_epochs = 10
 best_val_loss = float('inf')
@@ -292,5 +318,5 @@ for epoch in range(num_epochs):
         best_val_loss = val_loss
         torch.save(model.state_dict(), 'best_loss_model.pth')
 
-    scheduler.step(val_loss)
+    scheduler.step()
 
