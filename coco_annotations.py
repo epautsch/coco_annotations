@@ -170,7 +170,9 @@ class ImageCaptioningModel(nn.Module):
 
     def forward(self, images, captions):
         image_features = self.image_encoder(images)
-        output = self.caption_decoder(captions, image_features)
+        start_token_embeddings = self.caption_decoder.embedding(torch.tensor([self.caption_decoder.embedding.num_embeddings -2], device=device)).repeat(image_features.shape[0], 1, 1)
+        memory = torch.cat([start_token_embeddings, image_features], dim=1)
+        output = self.caption_decoder(captions, memory)
         return output
 
 
