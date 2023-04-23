@@ -195,7 +195,8 @@ image_encoder = VisionTransformer(in_channels=3,
                                   num_heads=12,
                                   mlp_dim=3072,
                                   num_classes=768).to(device)
-caption_decoder = TransformerCaptionDecoder(vocab_size=len(caption_preprocessor.vocab),
+max_caption_index = max([max(caption) for caption in caption_preprocessor.captions_tokenized])
+caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
                                             d_model=768,
                                             num_layers=6,
                                             num_heads=8,
