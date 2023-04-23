@@ -368,7 +368,7 @@ for epoch in range(num_epochs):
     print(f'Epoch {epoch+1} training time: {epoch_train_time}')
 
     epoch_max_min_diff = epoch_max_loss - epoch_min_loss
-    if epoch + 1 is not 1:
+    if epoch + 1 != 1:
         max_min_loss_diffs.append(epoch_max_min_diff)
     print(f'Difference between max and min loss in epoch {epoch+1}: {epoch_max_min_diff}')
 
