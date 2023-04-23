@@ -241,10 +241,10 @@ for epoch in range(num_epochs):
 
         print("Output shape:", output.shape)
         print("Captions target shape:", captions_target.shape)
-        print("Output view shape:", output.view(-1, 24535).shape)
+        print("Output view shape:", output.reshape(-1, 24535).shape)
         print("Captions target view shape:", captions_target.view(-1).shape)
 
-        loss = criterion(output.view(-1, len(caption_preprocessor.vocab)), captions_target.view(-1))
+        loss = criterion(output.reshape(-1, 24535), captions_target.view(-1))
         loss.backward()
         optimizer.step()
 
