@@ -205,6 +205,9 @@ for epoch in range(num_epochs):
         captions_input = captions[:, :-1].to(device)
         captions_target = captions[:, 1:].to(device)
 
+        print("Captions shape:", captions_input.shape)
+        print("Memory shape:", images.shape)
+
         optimizer.zero_grad()
         output = model(images, captions_input)
         loss = criterion(output.view(-1, len(caption_preprocessor.vacab)), captions_target.view(-1))
