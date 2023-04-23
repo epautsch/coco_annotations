@@ -75,18 +75,6 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[5]:
-
-
-dataset = CocoCaptions(root='./coco/images',
-                       annFile='./coco/annotations/captions_train2014.json',
-                       transform=image_transform)
-captions = [entry['caption'] for entry in dataset.coco.anns.values()]
-caption_preprocessor = CaptionPreprocessor(captions)
-custom_dataset = CustomCocoDataset(dataset, caption_preprocessor)
-data_loader = DataLoader(custom_dataset, batch_size=32, shuffle=True, num_workers=4)
-
-
 # In[6]:
 
 
@@ -171,11 +159,25 @@ class ImageCaptioningModel(nn.Module):
 
     def forward(self, images, captions):
         image_features = self.image_encoder(images)
-        image_features_flattened = image_features.view(image_features.size(0), -1, self.embedding_size) # Flatten the image features and match the embedding size
+        num_patches = (224 // 16) * (224 // 16)
+        image_features_flattened = image_features.permute(1, 0, 2).view(num_patches, -1, self.embedding_size)
+
         start_token_embeddings = self.caption_decoder.embedding(torch.tensor([self.caption_decoder.embedding.num_embeddings - 2], device=device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
         memory = torch.cat([start_token_embeddings, image_features_flattened], dim=1) # Concatenate the start token embeddings with the flattened image features
         output = self.caption_decoder(captions, memory)
         return output
+
+
+# In[ ]:
+
+
+dataset = CocoCaptions(root='./coco/images',
+                       annFile='./coco/annotations/captions_train2014.json',
+                       transform=image_transform)
+captions = [entry['caption'] for entry in dataset.coco.anns.values()]
+caption_preprocessor = CaptionPreprocessor(captions)
+custom_dataset = CustomCocoDataset(dataset, caption_preprocessor)
+data_loader = DataLoader(custom_dataset, batch_size=32, shuffle=True, num_workers=4)
 
 
 # In[8]:
