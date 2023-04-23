@@ -256,6 +256,10 @@ for epoch in range(num_epochs):
 
         optimizer.zero_grad()
         output = model(images, captions_input)
+
+        print("Output tensor shape:", output.shape)
+        print("Captions target tensor shape:", captions_target.shape)
+
         loss = criterion(output.reshape(-1, 24535), captions_target.view(-1))
         loss.backward()
         optimizer.step()
