@@ -167,7 +167,7 @@ class ImageCaptioningModel(nn.Module):
         num_patches = (224 // 16) * (224 // 16)
         image_features_flattened = image_features.permute(1, 0, 2).reshape(-1, num_patches, self.embedding_size)
 
-        print("Start token index:", caption_preprocessor.vocab['<start>'])
+        # print("Start token index:", caption_preprocessor.vocab['<start>'])
 
         start_token_embeddings = self.caption_decoder.embedding(torch.tensor([caption_preprocessor.vocab['<start>']], device=device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
         image_features_summed = image_features_flattened.sum(dim=1).unsqueeze(1)
