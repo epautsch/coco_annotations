@@ -389,8 +389,10 @@ for epoch in range(num_epochs):
         train_loss += loss.item()
         if train_loss > epoch_max_loss:
             epoch_max_loss = train_loss
+            print(f'Max loss set to: {epoch_max_loss}')
         if train_loss < epoch_min_loss:
             epoch_min_loss = train_loss
+            print(f'Min loss set to: {epoch_min_loss}')
 
         if i % 20 == 0:
             print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss: {loss.item()}')
