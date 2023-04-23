@@ -150,7 +150,7 @@ class TransformerCaptionDecoder(nn.Module):
         self.output_layer = nn.Linear(d_model, vocab_size)
 
     def forward(self, captions, memory):
-        captions = self.embedding(captions) + self.positional_encoding[:, :captions.shape[1]]
+        captions = self.embedding(captions) + self.positional_encoding.encoding[:, :captions.shape[1]]
 
         for layer in self.transformer_layers:
             captions = layer(captions, memory)
