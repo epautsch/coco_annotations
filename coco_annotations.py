@@ -69,7 +69,8 @@ class CustomCocoDataset(Dataset):
         return len(self.coco_dataset)
 
     def __getitem__(self, idx):
-        img, caption = self.coco_dataset[idx]
+        img, caption_list = self.coco_dataset[idx]
+        caption = caption_list[0]
         preprocessed_caption = torch.tensor(self.caption_preprocessor.preprocess(caption))
         return img, preprocessed_caption
 
