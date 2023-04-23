@@ -260,7 +260,7 @@ for epoch in range(num_epochs):
         print("Output tensor shape:", output.shape)
         print("Captions target tensor shape:", captions_target.shape)
 
-        loss = criterion(output.reshape(-1, 24535), captions_target.view(-1))
+        loss = criterion(output.reshape(-1, 28796), captions_target.view(-1))
         loss.backward()
         optimizer.step()
 
@@ -280,7 +280,7 @@ for epoch in range(num_epochs):
             captions_target = captions[:, 1:].to(device)
 
             output = model(images, captions_input)
-            loss = criterion(output.reshape(-1, 24535), captions_target.view(-1))
+            loss = criterion(output.reshape(-1, 28796), captions_target.view(-1))
 
             val_loss += loss.item()
 
@@ -292,10 +292,4 @@ for epoch in range(num_epochs):
         torch.save(model.state_dict(), 'best_loss_model.pth')
 
     scheduler.step(val_loss)
-
-
-# In[ ]:
-
-
-
 
