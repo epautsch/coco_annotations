@@ -1,24 +1,25 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 from collections import Counter
+import math
 
 from torchvision.datasets import CocoCaptions
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-from torch.nn.utils.rnn import pad_sequence
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import nltk
 nltk.download('punkt')
 
 
-# In[2]:
+# In[ ]:
 
 
 image_transform = Compose([
@@ -29,7 +30,7 @@ image_transform = Compose([
 ])
 
 
-# In[3]:
+# In[ ]:
 
 
 class CaptionPreprocessor:
@@ -62,7 +63,7 @@ class CaptionPreprocessor:
         return [self.preprocess(caption) for caption in captions]
 
 
-# In[4]:
+# In[ ]:
 
 
 class CustomCocoDataset(Dataset):
@@ -80,7 +81,7 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[6]:
+# In[ ]:
 
 
 class PatchEmbedding(nn.Module):
@@ -116,7 +117,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[7]:
+# In[ ]:
 
 
 class PositionalEncoding(nn.Module):
@@ -152,7 +153,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[8]:
+# In[ ]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -187,19 +188,25 @@ class ImageCaptioningModel(nn.Module):
 # In[ ]:
 
 
-dataset = CocoCaptions(root='./coco/images',
+train_dataset = CocoCaptions(root='./coco/images',
                        annFile='./coco/annotations/captions_train2014.json',
                        transform=image_transform)
-captions = [entry['caption'] for entry in dataset.coco.anns.values()]
-caption_preprocessor = CaptionPreprocessor(captions)
-custom_dataset = CustomCocoDataset(dataset, caption_preprocessor)
-data_loader = DataLoader(custom_dataset, batch_size=32, shuffle=True, num_workers=4)
+val_dataset = CocoCaptions(root='./coco/images',
+                           annFile='./coco/annotations/captions_val2014.json',
+                           transform=image_transform)
+train_captions = [entry['caption'] for entry in train_dataset.coco.anns.values()]
+val_captions = [entry['caption'] for entry in val_dataset.coco.anns.values()]
+caption_preprocessor = CaptionPreprocessor(train_captions + val_captions)
+custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor)
+custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
+
+batch_size = 512
+train_data_loader = DataLoader(custom_train_dataset, batch_size=512, shuffle=True, num_workers=4)
+val_data_loader = DataLoader(custom_val_dataset, batch_size=512, shuffle=True, num_workers=4)
 
 
-# In[8]:
+# In[ ]:
 
-
-import math
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
@@ -223,40 +230,58 @@ model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size).to(
 criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
+
 num_epochs = 10
+best_val_loss = float('inf')
+
 print('**********STARTING TRAINING**********')
 for epoch in range(num_epochs):
     model.train()
-    total_samples = len(data_loader.dataset)
-    batch_size = data_loader.batch_size
+    train_loss = 0
+    total_samples = len(train_data_loader.dataset)
+    batch_size = train_data_loader.batch_size
     max_iterations = math.ceil(total_samples / batch_size)
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
-    for i, (images, captions) in enumerate(data_loader):
+    for i, (images, captions) in enumerate(train_data_loader):
         images = images.to(device)
         captions_input = captions[:, :-1].to(device)
         captions_target = captions[:, 1:].to(device)
 
-        # print("Captions shape:", captions_input.shape)
-        # print("Memory shape:", images.shape)
-        #
-        # print("Max index in captions_input:", captions_input.max().item())
-        #
-        # print("Embedding layer num_embeddings:", model.caption_decoder.embedding.num_embeddings)
-
         optimizer.zero_grad()
         output = model(images, captions_input)
-
-        # print("Output shape:", output.shape)
-        # print("Captions target shape:", captions_target.shape)
-        # print("Output view shape:", output.reshape(-1, 24535).shape)
-        # print("Captions target view shape:", captions_target.view(-1).shape)
-
         loss = criterion(output.reshape(-1, 24535), captions_target.view(-1))
         loss.backward()
         optimizer.step()
 
+        train_loss += loss.item()
+
         if i % 100 == 0:
             print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss: {loss.item()}')
+
+    train_loss /= len(train_data_loader)
+
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for images, captions in val_data_loader:
+            images = images.to(device)
+            captions_input = captions[:, :-1].to(device)
+            captions_target = captions[:, 1:].to(device)
+
+            output = model(images, captions_input)
+            loss = criterion(output.reshape(-1, 24535), captions_target.view(-1))
+
+            val_loss += loss.item()
+
+    val_loss /= len(val_data_loader)
+    print(f'Epoch: {epoch+1}/{num_epochs}, Train Loss: {train_loss}, Val Loss: {val_loss}')
+
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        torch.save(model.state_dict(), 'best_loss_model.pth')
+
+    scheduler.step(val_loss)
 
 
 # In[ ]:
