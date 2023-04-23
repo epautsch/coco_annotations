@@ -222,6 +222,7 @@ criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>']
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 num_epochs = 10
+print('**********STARTING TRAINING**********')
 for epoch in range(num_epochs):
     model.train()
     for i, (images, captions) in enumerate(data_loader):
@@ -229,20 +230,20 @@ for epoch in range(num_epochs):
         captions_input = captions[:, :-1].to(device)
         captions_target = captions[:, 1:].to(device)
 
-        print("Captions shape:", captions_input.shape)
-        print("Memory shape:", images.shape)
-
-        print("Max index in captions_input:", captions_input.max().item())
-
-        print("Embedding layer num_embeddings:", model.caption_decoder.embedding.num_embeddings)
+        # print("Captions shape:", captions_input.shape)
+        # print("Memory shape:", images.shape)
+        #
+        # print("Max index in captions_input:", captions_input.max().item())
+        #
+        # print("Embedding layer num_embeddings:", model.caption_decoder.embedding.num_embeddings)
 
         optimizer.zero_grad()
         output = model(images, captions_input)
 
-        print("Output shape:", output.shape)
-        print("Captions target shape:", captions_target.shape)
-        print("Output view shape:", output.reshape(-1, 24535).shape)
-        print("Captions target view shape:", captions_target.view(-1).shape)
+        # print("Output shape:", output.shape)
+        # print("Captions target shape:", captions_target.shape)
+        # print("Output view shape:", output.reshape(-1, 24535).shape)
+        # print("Captions target view shape:", captions_target.view(-1).shape)
 
         loss = criterion(output.reshape(-1, 24535), captions_target.view(-1))
         loss.backward()
