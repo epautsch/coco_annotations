@@ -238,6 +238,12 @@ for epoch in range(num_epochs):
 
         optimizer.zero_grad()
         output = model(images, captions_input)
+
+        print("Output shape:", output.shape)
+        print("Captions target shape:", captions_target.shape)
+        print("Output view shape:", output.view(-1, len(caption_preprocessor.vocab)).shape)
+        print("Captions target view shape:", captions_target.view(-1).shape)
+
         loss = criterion(output.view(-1, len(caption_preprocessor.vocab)), captions_target.view(-1))
         loss.backward()
         optimizer.step()
