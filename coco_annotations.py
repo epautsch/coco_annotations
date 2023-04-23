@@ -237,7 +237,7 @@ for epoch in range(num_epochs):
 
         optimizer.zero_grad()
         output = model(images, captions_input)
-        loss = criterion(output.view(-1, len(caption_preprocessor.vacab)), captions_target.view(-1))
+        loss = criterion(output.view(-1, len(caption_preprocessor.vocab)), captions_target.view(-1))
         loss.backward()
         optimizer.step()
 
