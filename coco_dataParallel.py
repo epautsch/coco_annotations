@@ -241,7 +241,7 @@ def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
     ax.legend(fontsize=12)
     fig.savefig('learning_rates.png')
 
-    fig_ax = plt.subplots(figsize=15, 6)
+    fig_ax = plt.subplots(figsize=(15, 6))
     ax.plot(max_min_loss_diffs, label='Loss Difference')
     ax.set_xlabel('Epochs', fontsize=14)
     ax.set_ylabel('Loss Difference', fontsize=14)
