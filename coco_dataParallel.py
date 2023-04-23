@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 from collections import Counter
@@ -17,13 +17,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import torch.nn.init as init
 import nltk
 nltk.download('punkt')
 import matplotlib.pyplot as plt
 from matplotlib import style
 
 
-# In[2]:
+# In[ ]:
 
 
 image_transform = Compose([
@@ -34,7 +35,7 @@ image_transform = Compose([
 ])
 
 
-# In[3]:
+# In[ ]:
 
 
 class CaptionPreprocessor:
@@ -67,7 +68,7 @@ class CaptionPreprocessor:
         return [self.preprocess(caption) for caption in captions]
 
 
-# In[4]:
+# In[ ]:
 
 
 class CustomCocoDataset(Dataset):
@@ -85,13 +86,14 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[5]:
+# In[ ]:
 
 
 class PatchEmbedding(nn.Module):
     def __init__(self, patch_size, in_channels, embed_dim):
         super().__init__()
         self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
+        init.xavier_uniform_(self.proj.weight)
 
     def forward(self, x):
         x = self.proj(x)
@@ -121,7 +123,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[6]:
+# In[ ]:
 
 
 class PositionalEncoding(nn.Module):
@@ -140,12 +142,14 @@ class TransformerCaptionDecoder(nn.Module):
         super().__init__()
 
         self.embedding = nn.Embedding(vocab_size, d_model)
+        init.xavier_uniform_(self.embedding.weight)
         self.positional_encoding = PositionalEncoding(d_model, max_len)
         self.transformer_layers = nn.ModuleList([
             nn.TransformerDecoderLayer(d_model, num_heads, mlp_dim)
             for _ in range(num_layers)
         ])
         self.output_layer = nn.Linear(d_model, vocab_size)
+        init.xavier_uniform_(self.output_layer.weight)
 
     def forward(self, captions, memory):
         captions = self.embedding(captions) + self.positional_encoding.encoding[:, :captions.shape[1]]
@@ -157,7 +161,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[7]:
+# In[ ]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -190,7 +194,7 @@ class ImageCaptioningModel(nn.Module):
         return output
 
 
-# In[8]:
+# In[ ]:
 
 
 class NoamScheduler:
@@ -214,7 +218,7 @@ class NoamScheduler:
         return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
-# In[9]:
+# In[ ]:
 
 
 def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
@@ -252,7 +256,7 @@ def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
     fig.savefig('loss_differences.png')
 
 
-# In[10]:
+# In[ ]:
 
 
 train_dataset = CocoCaptions(root='./coco/images',
@@ -273,48 +277,9 @@ caption_preprocessor = CaptionPreprocessor(train_captions + val_captions)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
 
-batch_size = 192
+batch_size = 128
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-
-
-# In[13]:
-
-
-# print(plt.style.available)
-#
-# plt.style.use('classic')
-# # Some example data
-# epochs = list(range(1, 251))
-# train_losses = [1 / epoch for epoch in epochs]
-# val_losses = [(1 / epoch) + 0.1 for epoch in epochs]
-#
-# # Create the figure and axes with a specified figure size
-# fig, ax = plt.subplots(figsize=(15, 6))
-#
-# # Plot the training and validation losses
-# ax.plot(epochs, train_losses, label='Training Loss', color='blue')
-# ax.plot(epochs, val_losses, label='Validation Loss', color='orange')
-#
-# # Set labels and title
-# ax.set_xlabel('Epoch', fontsize=14)
-# ax.set_ylabel('Loss', fontsize=14)
-# ax.set_title('Training and Validation Losses', fontsize=16)
-#
-# # Increase the size of the tick labels
-# ax.tick_params(axis='both', which='major', labelsize=12)
-#
-# # Add a grid for better readability
-# ax.grid()
-#
-# # Add a legend
-# ax.legend(fontsize=12)
-#
-# # Save the figure
-# fig.savefig('losses_plot.png')
-#
-# # Display the plot
-# plt.show()
 
 
 # In[ ]:
