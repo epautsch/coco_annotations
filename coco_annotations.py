@@ -229,7 +229,8 @@ caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
                                             d_model=768,
                                             num_layers=6,
                                             num_heads=8,
-                                            mlp_dim=2048).to(device)
+                                            mlp_dim=2048,
+                                            max_len=max_caption_length + 2).to(device)
 embedding_size = 768
 model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size).to(device)
 
