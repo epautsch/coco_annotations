@@ -199,6 +199,8 @@ data_loader = DataLoader(custom_dataset, batch_size=32, shuffle=True, num_worker
 # In[8]:
 
 
+import math
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
@@ -225,6 +227,10 @@ num_epochs = 10
 print('**********STARTING TRAINING**********')
 for epoch in range(num_epochs):
     model.train()
+    total_samples = len(data_loader.dataset)
+    batch_size = data_loader.batch_size
+    max_iterations = math.ceil(total_samples / batch_size)
+    print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
     for i, (images, captions) in enumerate(data_loader):
         images = images.to(device)
         captions_input = captions[:, :-1].to(device)
