@@ -47,6 +47,8 @@ class CaptionPreprocessor:
 
         self.idx_to_token = {idx: token for token, idx in self.vocab.items()}
 
+        self.captions_tokenized = self.tokenize_captions(captions)
+
     def preprocess(self, caption):
         tokens = nltk.tokenize.word_tokenize(caption.lower())
         caption_indices = [self.vocab['<start>']] + [self.vocab.get(token, self.vocab['<unk>']) for token in tokens] + [self.vocab['<end>']]
@@ -55,6 +57,9 @@ class CaptionPreprocessor:
             caption_indices += [self.vocab['<pad>']] * (self.max_caption_length - len(caption_indices))
 
         return caption_indices[:self.max_caption_length]
+
+    def tokenize_captions(self, captions):
+        return [self.preprocess(caption) for caption in captions]
 
 
 # In[4]:
