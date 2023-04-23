@@ -163,10 +163,11 @@ class TransformerCaptionDecoder(nn.Module):
 
 
 class ImageCaptioningModel(nn.Module):
-    def __init__(self, image_encoder, caption_decoder):
+    def __init__(self, image_encoder, caption_decoder, embedding_size):
         super(ImageCaptioningModel, self).__init__()
         self.image_encoder = image_encoder
         self.caption_decoder = caption_decoder
+        self.embedding_size = embedding_size
 
     def forward(self, images, captions):
         image_features = self.image_encoder(images)
@@ -175,7 +176,6 @@ class ImageCaptioningModel(nn.Module):
         memory = torch.cat([start_token_embeddings, image_features_flattened], dim=1) # Concatenate the start token embeddings with the flattened image features
         output = self.caption_decoder(captions, memory)
         return output
-
 
 
 # In[8]:
@@ -196,7 +196,8 @@ caption_decoder = TransformerCaptionDecoder(vocab_size=len(caption_preprocessor.
                                             num_layers=6,
                                             num_heads=8,
                                             mlp_dim=2048).to(device)
-model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
+embedding_size = 768
+model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size).to(device)
 
 criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
