@@ -387,11 +387,12 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         train_loss += loss.item()
-        if train_loss > epoch_max_loss:
-            epoch_max_loss = train_loss
+
+        if loss.item() > epoch_max_loss:
+            epoch_max_loss = loss.item()
             print(f'Max loss set to: {epoch_max_loss}')
-        if train_loss < epoch_min_loss:
-            epoch_min_loss = train_loss
+        if loss.item() < epoch_min_loss:
+            epoch_min_loss = loss.item()
             print(f'Min loss set to: {epoch_min_loss}')
 
         if i % 20 == 0:
