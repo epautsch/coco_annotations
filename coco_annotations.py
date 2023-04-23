@@ -170,11 +170,12 @@ class ImageCaptioningModel(nn.Module):
 
     def forward(self, images, captions):
         image_features = self.image_encoder(images)
-        image_features_flattened = image_features.view(image_features.size(0), image_features.size(1), -1).transpose(1, 2)
-        start_token_embeddings = self.caption_decoder.embedding(torch.tensor([self.caption_decoder.embedding.num_embeddings - 2], device=device)).repeat(image_features.shape[0], 1, 1)
-        memory = torch.cat([start_token_embeddings, image_features_flattened], dim=1)
+        image_features_flattened = image_features.view(image_features.size(0), -1, self.embedding_size) # Flatten the image features and match the embedding size
+        start_token_embeddings = self.caption_decoder.embedding(torch.tensor([self.caption_decoder.embedding.num_embeddings - 2], device=device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
+        memory = torch.cat([start_token_embeddings, image_features_flattened], dim=1) # Concatenate the start token embeddings with the flattened image features
         output = self.caption_decoder(captions, memory)
         return output
+
 
 
 # In[8]:
