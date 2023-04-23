@@ -132,7 +132,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, vocab_size, d_model, num_layers, num_heads, mlp_dim, max_len=100):
+    def __init__(self, vocab_size, d_model, num_layers, num_heads, mlp_dim, max_len=128):
         super().__init__()
 
         self.embedding = nn.Embedding(vocab_size, d_model)
@@ -196,6 +196,12 @@ val_dataset = CocoCaptions(root='./coco/images',
                            transform=image_transform)
 train_captions = [entry['caption'] for entry in train_dataset.coco.anns.values()]
 val_captions = [entry['caption'] for entry in val_dataset.coco.anns.values()]
+
+max_caption_length_train = max([len(nltk.tokenize.word_tokenize(caption.lower())) for caption in train_captions])
+max_caption_length_val = max([len(nltk.tokenize.word_tokenize(caption.lower())) for caption in val_captions])
+max_caption_length = max(max_caption_length_train, max_caption_length_val)
+print('Maximum caption length (without <start>, <end>, and <pad> tokens):', max_caption_length)
+
 caption_preprocessor = CaptionPreprocessor(train_captions + val_captions)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
