@@ -170,7 +170,8 @@ class ImageCaptioningModel(nn.Module):
         print("Start token index:", caption_preprocessor.vocab['<start>'])
 
         start_token_embeddings = self.caption_decoder.embedding(torch.tensor([caption_preprocessor.vocab['<start>']], device=device)).repeat(image_features.shape[0], 1, 1) # Get the <start> token embedding and repeat it for the batch size
-        memory = torch.cat([start_token_embeddings, image_features_flattened.permute(1, 0, 2)], dim=1) # Concatenate the start token embeddings with the flattened image features
+        image_features_summed = image_features_flattened.sum(dim=1).unsqueeze(1)
+        memory = torch.cat([start_token_embeddings, image_features_summed], dim=1) # Concatenate the start token embeddings with the flattened image features
 
         memory = memory.transpose(0, 1)
 
