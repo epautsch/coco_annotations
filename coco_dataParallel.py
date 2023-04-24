@@ -277,7 +277,7 @@ caption_preprocessor = CaptionPreprocessor(train_captions + val_captions)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
 
-batch_size = 32
+batch_size = 64
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
