@@ -315,11 +315,11 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
-optimizer = optim.Adam(model.parameters(), lr=3e-4)
+optimizer = optim.Adam(model.parameters(), lr=5e-4)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
 # scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
-scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * num_epochs, eta_min=1e-5)
+scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * 50, eta_min=1e-5)
 
 best_val_loss = float('inf')
 
