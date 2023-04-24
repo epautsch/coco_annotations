@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import torch.nn.init as init
 import nltk
 nltk.download('punkt')
@@ -308,13 +308,19 @@ if torch.cuda.device_count() > 1:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
+num_epochs = 250
+
+total_samples = len(train_data_loader.dataset)
+batch_size = train_data_loader.batch_size
+max_iterations = math.ceil(total_samples / batch_size)
+
 criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=3e-4)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
+# scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
+scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * num_epochs, eta_min=1e-5)
 
-num_epochs = 250
 best_val_loss = float('inf')
 
 train_losses = []
@@ -333,9 +339,7 @@ for epoch in range(num_epochs):
 
     model.train()
     train_loss = 0
-    total_samples = len(train_data_loader.dataset)
-    batch_size = train_data_loader.batch_size
-    max_iterations = math.ceil(total_samples / batch_size)
+
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
     epoch_train_start = time.time()
