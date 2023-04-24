@@ -277,7 +277,7 @@ caption_preprocessor = CaptionPreprocessor(train_captions + val_captions)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
 
-batch_size = 32
+batch_size = 24
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
@@ -304,7 +304,7 @@ caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
 embedding_size = 2000
 model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
 
-useTwoGPUs = False
+useTwoGPUs = True
 if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
@@ -316,11 +316,11 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
+optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=2000, warmup_steps=4000)
-# scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * 30, eta_min=1e-5)
+# scheduler = NoamScheduler(optimizer, d_model=2000, warmup_steps=4000)
+scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * 2, eta_min=1e-5)
 
 best_val_loss = float('inf')
 
