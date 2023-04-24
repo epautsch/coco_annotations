@@ -290,18 +290,18 @@ print(device)
 
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
-                                  embed_dim=768,
-                                  num_layers=12,
-                                  num_heads=12,
-                                  mlp_dim=3072,
-                                  num_classes=768).to(device)
+                                  embed_dim=2000,
+                                  num_layers=20,
+                                  num_heads=20,
+                                  mlp_dim=5120,
+                                  num_classes=2000).to(device)
 max_caption_index = max([max(caption) for caption in caption_preprocessor.captions_tokenized])
 caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
-                                            d_model=768,
-                                            num_layers=6,
-                                            num_heads=8,
-                                            mlp_dim=2048).to(device)
-embedding_size = 768
+                                            d_model=2000,
+                                            num_layers=20,
+                                            num_heads=20,
+                                            mlp_dim=5120).to(device)
+embedding_size = 2000
 model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
 
 if torch.cuda.device_count() > 1:
