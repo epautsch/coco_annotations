@@ -304,7 +304,7 @@ caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
 embedding_size = 2000
 model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
 
-useTwoGPUs = False
+useTwoGPUs = True
 if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
@@ -319,8 +319,8 @@ criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>']
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
-# scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
-scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * 30, eta_min=1e-5)
+scheduler = NoamScheduler(optimizer, d_model=2000, warmup_steps=4000)
+# scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * 30, eta_min=1e-5)
 
 best_val_loss = float('inf')
 
@@ -365,7 +365,7 @@ for epoch in range(num_epochs):
             epoch_min_loss = loss.item()
             print(f'Min loss set to: {epoch_min_loss}')
 
-        if i % 20 == 0:
+        if i % 50 == 0:
             print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss: {loss.item()}')
 
     epoch_train_end = time.time()
