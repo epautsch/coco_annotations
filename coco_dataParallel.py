@@ -304,7 +304,8 @@ caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
 embedding_size = 2000
 model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
 
-if torch.cuda.device_count() > 1:
+useTwoGPUs = False
+if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
