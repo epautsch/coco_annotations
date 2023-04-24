@@ -290,18 +290,18 @@ print(device)
 
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
-                                  embed_dim=2000,
+                                  embed_dim=1800,
                                   num_layers=20,
                                   num_heads=20,
                                   mlp_dim=5120,
-                                  num_classes=2000).to(device)
+                                  num_classes=1800).to(device)
 max_caption_index = max([max(caption) for caption in caption_preprocessor.captions_tokenized])
 caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
-                                            d_model=2000,
+                                            d_model=1800,
                                             num_layers=20,
                                             num_heads=20,
                                             mlp_dim=5120).to(device)
-embedding_size = 2000
+embedding_size = 1800
 model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
 
 useTwoGPUs = True
@@ -319,7 +319,7 @@ criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>']
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
-# scheduler = NoamScheduler(optimizer, d_model=2000, warmup_steps=4000)
+# scheduler = NoamScheduler(optimizer, d_model=1800, warmup_steps=4000)
 scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * 2, eta_min=1e-5)
 
 best_val_loss = float('inf')
