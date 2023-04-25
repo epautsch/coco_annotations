@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[25]:
 
 
 from collections import Counter
@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, CosineAnnealingWarmRestarts
 import torch.nn.init as init
 import nltk
 nltk.download('punkt')
@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 
 
-# In[ ]:
+# In[26]:
 
 
 image_transform = Compose([
@@ -35,7 +35,7 @@ image_transform = Compose([
 ])
 
 
-# In[ ]:
+# In[27]:
 
 
 class CaptionPreprocessor:
@@ -68,7 +68,7 @@ class CaptionPreprocessor:
         return [self.preprocess(caption) for caption in captions]
 
 
-# In[ ]:
+# In[28]:
 
 
 class CustomCocoDataset(Dataset):
@@ -86,7 +86,7 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[ ]:
+# In[29]:
 
 
 class PatchEmbedding(nn.Module):
@@ -123,7 +123,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[ ]:
+# In[30]:
 
 
 class PositionalEncoding(nn.Module):
@@ -161,7 +161,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[ ]:
+# In[31]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -194,7 +194,7 @@ class ImageCaptioningModel(nn.Module):
         return output
 
 
-# In[ ]:
+# In[32]:
 
 
 class NoamScheduler:
@@ -218,7 +218,7 @@ class NoamScheduler:
         return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
-# In[ ]:
+# In[33]:
 
 
 def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
@@ -256,7 +256,7 @@ def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
     fig.savefig('loss_differences.png')
 
 
-# In[ ]:
+# In[34]:
 
 
 train_dataset = CocoCaptions(root='./coco/images',
@@ -280,6 +280,63 @@ custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
 batch_size = 64
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+
+
+# In[43]:
+
+
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# print(device)
+#
+# image_encoder = VisionTransformer(in_channels=3,
+#                                   patch_size=16,
+#                                   embed_dim=1600,
+#                                   num_layers=16,
+#                                   num_heads=16,
+#                                   mlp_dim=5120,
+#                                   num_classes=1600).to(device)
+# max_caption_index = max([max(caption) for caption in caption_preprocessor.captions_tokenized])
+# caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
+#                                             d_model=1600,
+#                                             num_layers=20,
+#                                             num_heads=20,
+#                                             mlp_dim=5120).to(device)
+# embedding_size = 1600
+# model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
+#
+# useTwoGPUs = True
+# if torch.cuda.device_count() > 1 and useTwoGPUs:
+#     print(f'Using {torch.cuda.device_count()} GPUs')
+#     model = nn.DataParallel(model)
+#
+# num_epochs = 300
+#
+# total_samples = len(train_data_loader.dataset)
+# batch_size = train_data_loader.batch_size
+# max_iterations = math.ceil(total_samples / batch_size)
+#
+# criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
+# optimizer = optim.Adam(model.parameters(), lr=1e-5)
+#
+# # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
+# # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
+# # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs / 5, eta_min=1e-6)
+# scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
+#
+# import matplotlib.pyplot as plt
+# import numpy as np
+#
+# epochs = 300
+# lr = []
+# for i in range(epochs):
+#     scheduler.step()
+#     lr.append(optimizer.param_groups[0]['lr'])
+#
+# plt.plot(np.arange(epochs), lr)
+# plt.xlabel('Epochs')
+# plt.ylabel('Learning Rate')
+# plt.title('Cosine Annealing Learning Rate Schedule')
+# plt.show()
 
 
 # In[ ]:
@@ -309,7 +366,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 500
+num_epochs = 300
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -320,7 +377,8 @@ optimizer = optim.Adam(model.parameters(), lr=1e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
 # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
-scheduler = CosineAnnealingLR(optimizer, T_max=max_iterations * 2, eta_min=1e-6)
+# scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
+scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
 
 best_val_loss = float('inf')
 
