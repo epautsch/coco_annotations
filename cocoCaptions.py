@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[25]:
+# In[1]:
 
 
 from collections import Counter
 import math
 import os
 import time
+import random
+import copy
 
 from torchvision.datasets import CocoCaptions
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
@@ -22,9 +24,10 @@ import nltk
 nltk.download('punkt')
 import matplotlib.pyplot as plt
 from matplotlib import style
+from transformers import BertTokenizer, BertModel
 
 
-# In[26]:
+# In[2]:
 
 
 image_transform = Compose([
@@ -35,32 +38,21 @@ image_transform = Compose([
 ])
 
 
-# In[27]:
+# In[3]:
 
 
 class CaptionPreprocessor:
-    def __init__(self, captions, vocab_threshold=5, max_caption_length=20):
+    def __init__(self, captions, tokenizer, max_caption_length=20):
+        self.tokenizer = tokenizer
         self.max_caption_length = max_caption_length
-
-        all_tokens = [token for caption in captions for token in nltk.tokenize.word_tokenize(caption.lower())]
-        counter = Counter(all_tokens)
-        self.vocab = {token: idx for idx, (token, count) in enumerate(counter.items()) if count >= vocab_threshold}
-
-        self.vocab['<pad>'] = len(self.vocab)
-        self.vocab['<start>'] = len(self.vocab)
-        self.vocab['<end>'] = len(self.vocab)
-        self.vocab['<unk>'] = len(self.vocab)
-
-        self.idx_to_token = {idx: token for token, idx in self.vocab.items()}
-
         self.captions_tokenized = self.tokenize_captions(captions)
 
     def preprocess(self, caption):
-        tokens = nltk.tokenize.word_tokenize(caption.lower())
-        caption_indices = [self.vocab['<start>']] + [self.vocab.get(token, self.vocab['<unk>']) for token in tokens] + [self.vocab['<end>']]
+        tokens = self.tokenizer.tokenize(caption)
+        caption_indices = self.tokenizer.convert_tokens_to_ids(tokens)
 
         if len(caption_indices) < self.max_caption_length:
-            caption_indices += [self.vocab['<pad>']] * (self.max_caption_length - len(caption_indices))
+            caption_indices += [self.tokenizer.pad_token_id] * (self.max_caption_length - len(caption_indices))
 
         return caption_indices[:self.max_caption_length]
 
@@ -68,25 +60,26 @@ class CaptionPreprocessor:
         return [self.preprocess(caption) for caption in captions]
 
 
-# In[28]:
+# In[4]:
 
 
 class CustomCocoDataset(Dataset):
-    def __init__(self, coco_dataset, caption_preprocessor):
+    def __init__(self, coco_dataset, caption_preprocessor, num_captions=5):
         self.coco_dataset = coco_dataset
         self.caption_preprocessor = caption_preprocessor
+        self.num_captions = num_captions
 
     def __len__(self):
         return len(self.coco_dataset)
 
     def __getitem__(self, idx):
         img, caption_list = self.coco_dataset[idx]
-        caption = caption_list[0]
-        preprocessed_caption = torch.tensor(self.caption_preprocessor.preprocess(caption))
+        selected_caption = random.choice(caption_list[:self.num_captions])
+        preprocessed_caption = torch.tensor(self.caption_preprocessor.preprocess(selected_caption))
         return img, preprocessed_caption
 
 
-# In[29]:
+# In[5]:
 
 
 class PatchEmbedding(nn.Module):
@@ -123,7 +116,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[30]:
+# In[6]:
 
 
 class PositionalEncoding(nn.Module):
@@ -138,21 +131,20 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, vocab_size, d_model, num_layers, num_heads, mlp_dim, max_len=128):
+    def __init__(self, bert_model, d_model, num_layers, num_heads, mlp_dim, max_len=128):
         super().__init__()
 
-        self.embedding = nn.Embedding(vocab_size, d_model)
-        init.xavier_uniform_(self.embedding.weight)
+        self.bert_model = bert_model
         self.positional_encoding = PositionalEncoding(d_model, max_len)
         self.transformer_layers = nn.ModuleList([
             nn.TransformerDecoderLayer(d_model, num_heads, mlp_dim)
             for _ in range(num_layers)
         ])
-        self.output_layer = nn.Linear(d_model, vocab_size)
+        self.output_layer = nn.Linear(d_model, self.bert_model.config.vocab_size)
         init.xavier_uniform_(self.output_layer.weight)
 
     def forward(self, captions, memory):
-        captions = self.embedding(captions) + self.positional_encoding.encoding[:, :captions.shape[1]]
+        captions = self.bert_model.embeddings(captions) + self.positional_encoding.encoding[:, :captions.shape[1]]
 
         for layer in self.transformer_layers:
             captions = layer(captions, memory)
@@ -161,7 +153,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[31]:
+# In[7]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -194,7 +186,7 @@ class ImageCaptioningModel(nn.Module):
         return output
 
 
-# In[32]:
+# In[8]:
 
 
 class NoamScheduler:
@@ -218,7 +210,7 @@ class NoamScheduler:
         return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
-# In[33]:
+# In[9]:
 
 
 def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
@@ -256,7 +248,7 @@ def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
     fig.savefig('loss_differences.png')
 
 
-# In[34]:
+# In[ ]:
 
 
 train_dataset = CocoCaptions(root='./coco/images',
@@ -274,69 +266,12 @@ max_caption_length = max(max_caption_length_train, max_caption_length_val)
 print('Maximum caption length (without <start>, <end>, and <pad> tokens):', max_caption_length)
 
 caption_preprocessor = CaptionPreprocessor(train_captions + val_captions)
-custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor)
-custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor)
+custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
+custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
 batch_size = 64
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-
-
-# In[43]:
-
-
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# print(device)
-#
-# image_encoder = VisionTransformer(in_channels=3,
-#                                   patch_size=16,
-#                                   embed_dim=1600,
-#                                   num_layers=16,
-#                                   num_heads=16,
-#                                   mlp_dim=5120,
-#                                   num_classes=1600).to(device)
-# max_caption_index = max([max(caption) for caption in caption_preprocessor.captions_tokenized])
-# caption_decoder = TransformerCaptionDecoder(vocab_size=max_caption_index + 1,
-#                                             d_model=1600,
-#                                             num_layers=20,
-#                                             num_heads=20,
-#                                             mlp_dim=5120).to(device)
-# embedding_size = 1600
-# model = ImageCaptioningModel(image_encoder, caption_decoder, embedding_size, caption_preprocessor.vocab['<start>']).to(device)
-#
-# useTwoGPUs = True
-# if torch.cuda.device_count() > 1 and useTwoGPUs:
-#     print(f'Using {torch.cuda.device_count()} GPUs')
-#     model = nn.DataParallel(model)
-#
-# num_epochs = 300
-#
-# total_samples = len(train_data_loader.dataset)
-# batch_size = train_data_loader.batch_size
-# max_iterations = math.ceil(total_samples / batch_size)
-#
-# criterion = nn.CrossEntropyLoss(ignore_index=caption_preprocessor.vocab['<pad>'])
-# optimizer = optim.Adam(model.parameters(), lr=1e-5)
-#
-# # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
-# # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
-# # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs / 5, eta_min=1e-6)
-# scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
-#
-# import matplotlib.pyplot as plt
-# import numpy as np
-#
-# epochs = 300
-# lr = []
-# for i in range(epochs):
-#     scheduler.step()
-#     lr.append(optimizer.param_groups[0]['lr'])
-#
-# plt.plot(np.arange(epochs), lr)
-# plt.xlabel('Epochs')
-# plt.ylabel('Learning Rate')
-# plt.title('Cosine Annealing Learning Rate Schedule')
-# plt.show()
 
 
 # In[ ]:
