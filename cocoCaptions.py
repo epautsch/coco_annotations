@@ -189,6 +189,51 @@ class ImageCaptioningModel(nn.Module):
 # In[ ]:
 
 
+def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, avg_every):
+    model.train()
+    train_loss = 0
+    last_x_losses = []
+    for i, (images, captions) in enumerate(tqdm(dataloader, desc='Training')):
+    # for i, (images, captions) in enumerate(dataloader):
+        images = images.to(device)
+        captions_input = captions[:, :-1].to(device)
+        captions_target = captions[:, 1:].to(device)
+
+        optimizer.zero_grad()
+        output = model(images, captions_input)
+
+        loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
+        loss.backward()
+        optimizer.step()
+
+        train_loss += loss.item()
+        last_x_losses.append(loss.item())
+
+        if i % avg_every == 0:
+            avg_loss = sum(last_x_losses) / len(last_x_losses)
+            print(f'Epoch: {epoch+1}, Iteration: {i}, Loss (last {avg_every} iterations: {avg_loss}')
+    return train_loss / len(dataloader)
+
+def evaluate(model, dataloader, criterion, device):
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for images, captions in tqdm(dataloader, desc='Validating'):
+        # for images, captions in dataloader:
+            image = images.to(device)
+            captions_input = captions[:, :-1].to(device)
+            captions_target = captions[:, 1:].to(device)
+
+            output = model(images, captions_input)
+            loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
+
+            val_loss += loss.item()
+    return val_loss / len(dataloader)
+
+
+# In[ ]:
+
+
 class NoamScheduler:
     def __init__(self, optimizer, d_model, warmup_steps=4000):
         self.optimizer = optimizer
@@ -313,7 +358,7 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
+optimizer = optim.Adam(model.parameters(), lr=1e-2)
 
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.9, patience=2, verbose=True)
 # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
@@ -326,49 +371,6 @@ train_losses = []
 val_losses = []
 learning_rates = []
 max_min_loss_diffs = []
-save_name = ''
-
-def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, avg_every):
-    model.train()
-    train_loss = 0
-    last_x_losses = []
-    for i, (images, captions) in enumerate(tqdm(dataloader, desc='Training')):
-    # for i, (images, captions) in enumerate(dataloader):
-        images = images.to(device)
-        captions_input = captions[:, :-1].to(device)
-        captions_target = captions[:, 1:].to(device)
-
-        optimizer.zero_grad()
-        output = model(images, captions_input)
-
-        loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
-        loss.backward()
-        optimizer.step()
-
-        train_loss += loss.item()
-        last_x_losses.append(loss.item())
-
-        if i % avg_every == 0:
-            avg_loss = sum(last_x_losses) / len(last_x_losses)
-            print(f'Epoch: {epoch+1}, Iteration: {i}, Loss (last {avg_every} iterations: {avg_loss}')
-    return train_loss / len(dataloader)
-
-def evaluate(model, dataloader, criterion, device):
-    model.eval()
-    val_loss = 0
-    with torch.no_grad():
-        for images, captions in tqdm(dataloader, desc='Validating'):
-        # for images, captions in dataloader:
-            image = images.to(device)
-            captions_input = captions[:, :-1].to(device)
-            captions_target = captions[:, 1:].to(device)
-
-            output = model(images, captions_input)
-            loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
-
-            val_loss += loss.item()
-    return val_loss / len(dataloader)
-
 
 print('**********STARTING TRAINING**********')
 training_start = time.time()
@@ -393,8 +395,9 @@ for epoch in range(num_epochs):
     if val_loss < best_val_loss:
         best_val_loss = val_loss
 
-        save_name = f'best_loss_model_{epoch}.pt'
+        save_name = f'best_loss_model.pt'
         torch.save(model.state_dict(), save_name)
+        print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss}**********')
 
     scheduler.step(val_loss)
 
