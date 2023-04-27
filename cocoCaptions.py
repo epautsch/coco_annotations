@@ -378,7 +378,7 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=3e-2, weight_decay=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=1e-1, weight_decay=1e-4)
 
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.9, patience=2, verbose=True)
 # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
@@ -414,6 +414,7 @@ for epoch in range(num_epochs):
     avg_every = 25
     train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, device, epoch, avg_every)
     val_loss = evaluate(model, val_data_loader, criterion, device)
+    print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
 
     epoch_end = time.time()
     print(f'Epoch {epoch+1} total time: {epoch_end - epoch_start}')
