@@ -352,17 +352,17 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=16,
+                                  num_layers=8,
                                   num_heads=16,
-                                  mlp_dim=1024,
+                                  mlp_dim=512,
                                   num_classes=768).to(device)
 
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=16,
+                                            num_layers=8,
                                             num_heads=16,
-                                            mlp_dim=1024).to(device)
+                                            mlp_dim=512).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
@@ -378,7 +378,7 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=1e-1, weight_decay=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=2e-3, weight_decay=1e-4)
 
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.9, patience=2, verbose=True)
 # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
@@ -392,7 +392,7 @@ val_losses = []
 learning_rates = []
 max_min_loss_diffs = []
 
-load_best_model = True
+load_best_model = False
 best_model_path = 'best_loss_model.pt'
 if load_best_model and os.path.exists(best_model_path):
     state_dict = torch.load(best_model_path)
@@ -425,7 +425,7 @@ for epoch in range(num_epochs):
     if val_loss < best_val_loss:
         best_val_loss = val_loss
 
-        save_name = f'best_loss_model.pt'
+        save_name = f'best_loss_model1.pt'
         torch.save(model.state_dict(), save_name)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss}**********')
 
