@@ -230,7 +230,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, avg_
 
         if i % avg_every == 0:
             avg_loss = sum(last_x_losses) / len(last_x_losses)
-            print(f'Epoch: {epoch+1}, Iteration: {i}, Loss (last {avg_every} iterations: {avg_loss}')
+            print(f'Epoch: {epoch+1}, Iteration: {i}, Loss (last {avg_every} iterations): {avg_loss:.4f}')
     return train_loss / len(dataloader)
 
 def evaluate(model, dataloader, criterion, device):
@@ -391,6 +391,15 @@ train_losses = []
 val_losses = []
 learning_rates = []
 max_min_loss_diffs = []
+
+load_best_model = True
+best_model_path = 'best_loss_model.pt'
+if load_best_model and os.path.exists(best_model_path):
+    state_dict = torch.load(best_model_path)
+    model.load_state_dict(state_dict)
+    print('Loaded best saved model...')
+    best_val_loss = evaluate(model, val_data_loader, criterion, device)
+    print(f'Validation loss of hte loaded model: {best_val_loss:.4f}')
 
 print('**********STARTING TRAINING**********')
 training_start = time.time()
