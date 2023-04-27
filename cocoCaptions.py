@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 # just checking
@@ -23,6 +23,25 @@ import torch.nn.init as init
 import matplotlib.pyplot as plt
 from transformers import AutoTokenizer, AutoModel
 from tqdm import tqdm
+
+
+# In[8]:
+
+
+import numpy as np
+lr = 1e-2
+epochs = 300
+eps = []
+lrs = []
+for i in range(epochs):
+    eps.append(i)
+    lrs.append(lr)
+    lr *= 0.9
+
+fig, ax = plt.subplots()
+ax.plot(eps, lrs)
+ax.set_yscale('log')
+plt.show()
 
 
 # In[ ]:
@@ -296,6 +315,7 @@ def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
 # In[ ]:
 
 
+os.environ['TOKENIZERS_PARALLELISM'] = 'true'
 tokenizer_name = 'distilbert-base-uncased'
 tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
@@ -358,7 +378,7 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=3e-2, weight_decay=1e-4)
 
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.9, patience=2, verbose=True)
 # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
