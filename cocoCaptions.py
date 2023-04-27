@@ -378,7 +378,7 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=2e-3, weight_decay=1e-5)
+optimizer = optim.Adam(model.parameters(), lr=2e-3)  #, weight_decay=1e-5)
 
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.9, patience=2, verbose=True)
 # scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
@@ -392,8 +392,8 @@ val_losses = []
 learning_rates = []
 max_min_loss_diffs = []
 
-load_best_model = False
-best_model_path = 'best_loss_model.pt'
+load_best_model = True
+best_model_path = 'best_loss_model1.pt'
 if load_best_model and os.path.exists(best_model_path):
     state_dict = torch.load(best_model_path)
     model.load_state_dict(state_dict)
