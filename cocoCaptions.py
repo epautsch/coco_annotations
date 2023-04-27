@@ -352,7 +352,7 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=8,
+                                  num_layers=4,
                                   num_heads=16,
                                   mlp_dim=512,
                                   num_classes=768).to(device)
@@ -360,7 +360,7 @@ image_encoder = VisionTransformer(in_channels=3,
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=8,
+                                            num_layers=4,
                                             num_heads=16,
                                             mlp_dim=512).to(device)
 
@@ -371,7 +371,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 300
+num_epochs = 100
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
