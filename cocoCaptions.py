@@ -353,7 +353,7 @@ image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
                                   num_layers=4,
-                                  num_heads=16,
+                                  num_heads=12,
                                   mlp_dim=512,
                                   num_classes=768).to(device)
 
@@ -361,7 +361,7 @@ auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
                                             num_layers=4,
-                                            num_heads=16,
+                                            num_heads=12,
                                             mlp_dim=512).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
@@ -380,8 +380,8 @@ max_iterations = math.ceil(total_samples / batch_size)
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optimizer = optim.Adam(model.parameters(), lr=1e-3)  #, weight_decay=1e-5)
 
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-# scheduler = NoamScheduler(optimizer, d_model=1600, warmup_steps=4000)
+# scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
 
@@ -392,8 +392,8 @@ val_losses = []
 learning_rates = []
 max_min_loss_diffs = []
 
-load_best_model = True
-best_model_path = 'best_loss_model1.pt'
+load_best_model = False
+best_model_path = 'best_loss_model_noam.pt'
 if load_best_model and os.path.exists(best_model_path):
     state_dict = torch.load(best_model_path)
     model.load_state_dict(state_dict)
@@ -412,6 +412,9 @@ for epoch in range(num_epochs):
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
     avg_every = 25
+    curr_lr = optimizer.param_groups[0]['lr']
+    learning_rates.append(curr_lr)
+    print(f'**Learning rate set at: {curr_lr}')
     train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, device, epoch, avg_every)
     val_loss = evaluate(model, val_data_loader, criterion, device)
     print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
@@ -427,9 +430,9 @@ for epoch in range(num_epochs):
 
         save_name = f'best_loss_model1.pt'
         torch.save(model.state_dict(), save_name)
-        print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss}**********')
+        print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
-    scheduler.step(val_loss)
+    scheduler.step()
 
 training_end = time.time()
 print(f'Total training time: {training_end - training_start}')
