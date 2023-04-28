@@ -4,12 +4,12 @@
 # In[1]:
 
 
-# just checking
 import math
 import os
 import time
 import random
 import copy
+import pickle
 
 from torchvision.datasets import CocoCaptions
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
@@ -28,20 +28,20 @@ from tqdm import tqdm
 # In[8]:
 
 
-import numpy as np
-lr = 1e-2
-epochs = 300
-eps = []
-lrs = []
-for i in range(epochs):
-    eps.append(i)
-    lrs.append(lr)
-    lr *= 0.9
-
-fig, ax = plt.subplots()
-ax.plot(eps, lrs)
-ax.set_yscale('log')
-plt.show()
+# import numpy as np
+# lr = 1e-2
+# epochs = 300
+# eps = []
+# lrs = []
+# for i in range(epochs):
+#     eps.append(i)
+#     lrs.append(lr)
+#     lr *= 0.9
+#
+# fig, ax = plt.subplots()
+# ax.plot(eps, lrs)
+# ax.set_yscale('log')
+# plt.show()
 
 
 # In[ ]:
@@ -223,6 +223,9 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, avg_
 
         loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
         loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         optimizer.step()
 
         train_loss += loss.item()
@@ -277,7 +280,7 @@ class NoamScheduler:
 # In[ ]:
 
 
-def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
+def plot_and_save(train_losses, val_losses, learning_rates):
     plt.style.use('classic')
 
     fig, ax = plt.subplots(figsize=(15, 6))
@@ -301,15 +304,24 @@ def plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs):
     ax.legend(fontsize=12)
     fig.savefig('learning_rates.png')
 
-    fig_ax = plt.subplots(figsize=(15, 6))
-    ax.plot(max_min_loss_diffs, label='Loss Difference')
-    ax.set_xlabel('Epochs', fontsize=14)
-    ax.set_ylabel('Loss Difference', fontsize=14)
-    ax.set_title('Difference Between Max and Min Loss per Epoch', fontsize=16)
-    ax.tick_params(axis='both', which='major', labelsize=12)
-    ax.grid()
-    ax.legend(fontsize=12)
-    fig.savefig('loss_differences.png')
+
+# In[ ]:
+
+
+def save_lists_to_file(file_path, train_losses, val_losses, learning_rates):
+    data = {
+        'train_losses': train_losses,
+        'val_losses': val_losses,
+        'learning_rates': learning_rates,
+    }
+    with open(file_path, 'wb') as f:
+        pickle.dump(data, f)
+
+
+def load_lists_from_file(file_path):
+    with open(file_path, 'rb') as f:
+        data = pickle.load(f)
+    return data['train_losses'], data['val_losses'], data['learning_rates']
 
 
 # In[ ]:
@@ -390,16 +402,22 @@ best_val_loss = float('inf')
 train_losses = []
 val_losses = []
 learning_rates = []
-max_min_loss_diffs = []
 
 load_best_model = False
-best_model_path = 'best_loss_model_noam.pt'
+best_model_path = 'best_loss_model_noam_gradClipping.pt'
 if load_best_model and os.path.exists(best_model_path):
-    state_dict = torch.load(best_model_path)
-    model.load_state_dict(state_dict)
+    checkpoint = torch.load(best_model_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    scheduler.__dict__.update(checkpoint['scheduler_state_dict'])
+    best_val_loss = checkpoint['best_val_loss']
+    train_losses, val_losses, learning_rates = load_lists_from_file('training_data.pkl')
     print('Loaded best saved model...')
-    best_val_loss = evaluate(model, val_data_loader, criterion, device)
-    print(f'Validation loss of hte loaded model: {best_val_loss:.4f}')
+    print(f'Validation loss of the loaded model: {best_val_loss:.4f}')
+
+
+# In[ ]:
+
 
 print('**********STARTING TRAINING**********')
 training_start = time.time()
@@ -429,7 +447,13 @@ for epoch in range(num_epochs):
         best_val_loss = val_loss
 
         save_name = f'best_loss_model1.pt'
-        torch.save(model.state_dict(), save_name)
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.__dict__,
+            'best_val_loss': best_val_loss,
+        }, save_name)
+        save_lists_to_file('training_data.pkl', train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
     scheduler.step()
@@ -437,7 +461,7 @@ for epoch in range(num_epochs):
 training_end = time.time()
 print(f'Total training time: {training_end - training_start}')
 
-plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs)
+plot_and_save(train_losses, val_losses, learning_rates)
 
 
 # In[ ]:
