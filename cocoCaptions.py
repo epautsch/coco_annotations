@@ -411,7 +411,7 @@ if load_best_model and os.path.exists(best_model_path):
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scheduler.__dict__.update(checkpoint['scheduler_state_dict'])
     best_val_loss = checkpoint['best_val_loss']
-    train_losses, val_losses, learning_rates = load_lists_from_file('training_data.pkl')
+    train_losses, val_losses, learning_rates = load_lists_from_file('training_data_noam_gradClipping.pkl')
     print('Loaded best saved model...')
     print(f'Validation loss of the loaded model: {best_val_loss:.4f}')
 
@@ -446,14 +446,14 @@ for epoch in range(num_epochs):
     if val_loss < best_val_loss:
         best_val_loss = val_loss
 
-        save_name = f'best_loss_model1.pt'
+        save_name = f'best_loss_model_noam_gradClipping.pt'
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.__dict__,
             'best_val_loss': best_val_loss,
         }, save_name)
-        save_lists_to_file('training_data.pkl', train_losses, val_losses, learning_rates)
+        save_lists_to_file('training_data_noam_gradClipping.pkl', train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
     scheduler.step()
