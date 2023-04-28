@@ -224,7 +224,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, num_
         loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
 
         optimizer.step()
 
@@ -350,7 +350,7 @@ print('Maximum caption length (without <start>, <end>, and <pad> tokens):', max_
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 128
+batch_size = 256
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
@@ -383,17 +383,17 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 300
+num_epochs = 100
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=1e-3)  #, weight_decay=1e-5)
+optimizer = optim.Adam(model.parameters(), lr=0)  #, weight_decay=1e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=2000)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
 
@@ -404,14 +404,15 @@ val_losses = []
 learning_rates = []
 
 load_best_model = False
-best_model_path = 'best_loss_model_noam.pt'
+best_model_path = 'best_loss_model_noam_restart.pt'
+save_lists_path = 'training_data_noam_restart.pkl'
 if load_best_model and os.path.exists(best_model_path):
     checkpoint = torch.load(best_model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scheduler.__dict__.update(checkpoint['scheduler_state_dict'])
     best_val_loss = checkpoint['best_val_loss']
-    train_losses, val_losses, learning_rates = load_lists_from_file('training_data_noam.pkl')
+    train_losses, val_losses, learning_rates = load_lists_from_file(save_lists_path)
     start_epoch = len(train_losses)
     if start_epoch >= num_epochs:
         raise ValueError('Number of epochs to train on is too small')
@@ -454,14 +455,14 @@ for epoch in training_range:
     if val_loss < best_val_loss:
         best_val_loss = val_loss
 
-        save_name = f'best_loss_model_noam.pt'
+        save_name = best_model_path
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.__dict__,
             'best_val_loss': best_val_loss,
         }, save_name)
-        save_lists_to_file('training_data_noam.pkl', train_losses, val_losses, learning_rates)
+        save_lists_to_file(save_lists_path, train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
     scheduler.step()
