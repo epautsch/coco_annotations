@@ -205,10 +205,19 @@ class ImageCaptioningModel(nn.Module):
         return output
 
 
-# In[ ]:
+# In[1]:
 
 
-def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, num_epochs, avg_every):
+def train_one_epoch(model,
+                    dataloader,
+                    criterion,
+                    optimizer,
+                    scheduler,
+                    device,
+                    epoch,
+                    num_epochs,
+                    avg_every,
+                    learning_rates):
     model.train()
     train_loss = 0
     last_x_losses = []
@@ -226,7 +235,9 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, num_
 
         # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
 
+        learning_rates.append(optimizer.param_groups[0]['lr'])
         optimizer.step()
+        scheduler.step()
 
         train_loss += loss.item()
         last_x_losses.append(loss.item())
@@ -267,8 +278,6 @@ class NoamScheduler:
         self.current_step += 1
         lr = self.learning_rate()
         for param_group in self.optimizer.param_groups:
-            if param_group['lr'] != lr:
-                print(f"Learning rate changed: {param_group['lr']} -> {lr}")
             param_group['lr'] = lr
 
     def learning_rate(self):
@@ -432,18 +441,19 @@ training_start = time.time()
 for epoch in training_range:
     epoch_start = time.time()
 
-    epoch_max_loss = float('-inf')
-    epoch_min_loss = float('inf')
-
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
     avg_every = 20
-    curr_lr = optimizer.param_groups[0]['lr']
-    learning_rates.append(curr_lr)
-    print(f'**Learning rate set at: {curr_lr}')
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, device, epoch, num_epochs, avg_every)
-    val_loss = evaluate(model, val_data_loader, criterion, device)
+    old_lr = optimizer.param_groups[0]['lr']
+
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
+
+    new_lr = optimizer.param_groups[0]['lr']
+    if new_lr != old_lr:
+        print(f'****LR changed from {old_lr} ==> {new_lr}****')
+
+    val_loss = evaluate(model, val_data_loader, criterion, device)
     print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
 
     epoch_end = time.time()
@@ -465,98 +475,10 @@ for epoch in training_range:
         save_lists_to_file(save_lists_path, train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
-    scheduler.step()
-
 training_end = time.time()
 print(f'Total training time: {training_end - training_start}')
 
 plot_and_save(train_losses, val_losses, learning_rates)
-
-
-# In[ ]:
-
-
-# epoch_train_start = time.time()
-# for i, (images, captions) in enumerate(train_data_loader):
-#     images = images.to(device)
-#     captions_input = captions[:, :-1].to(device)
-#     captions_target = captions[:, 1:].to(device)
-#
-#     optimizer.zero_grad()
-#     output = model(images, captions_input)
-#
-#     loss = criterion(output.reshape(-1, 28796), captions_target.view(-1))
-#     loss.backward()
-#     optimizer.step()
-#
-#     train_loss += loss.item()
-#
-#     if loss.item() > epoch_max_loss:
-#         epoch_max_loss = loss.item()
-#         print(f'Max loss set to: {epoch_max_loss}')
-#     if loss.item() < epoch_min_loss:
-#         epoch_min_loss = loss.item()
-#         print(f'Min loss set to: {epoch_min_loss}')
-#
-#     if i % 50 == 0:
-#         print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss: {loss.item()}')
-#
-# epoch_train_end = time.time()
-# epoch_train_time = epoch_train_end - epoch_train_start
-# print(f'Epoch {epoch+1} training time: {epoch_train_time}')
-#
-# epoch_max_min_diff = epoch_max_loss - epoch_min_loss
-# if epoch + 1 != 1:
-#     max_min_loss_diffs.append(epoch_max_min_diff)
-# print(f'Difference between max and min loss in epoch {epoch+1}: {epoch_max_min_diff}')
-#
-# train_loss /= len(train_data_loader)
-#
-# model.eval()
-# val_loss = 0
-
-#     epoch_val_start = time.time()
-#     with torch.no_grad():
-#         for images, captions in val_data_loader:
-#             images = images.to(device)
-#             captions_input = captions[:, :-1].to(device)
-#             captions_target = captions[:, 1:].to(device)
-#
-#             output = model(images, captions_input)
-#             loss = criterion(output.reshape(-1, 28796), captions_target.view(-1))
-#
-#             val_loss += loss.item()
-#
-#     epoch_val_end = time.time()
-#     epoch_val_time = epoch_val_end - epoch_val_start
-#     print(f'Epoch {epoch+1} validation time: {epoch_val_time}')
-#
-#     epoch_end = time.time()
-#     epoch_time = epoch_end - epoch_start
-#     print(f'Epoch {epoch+1} total time: {epoch_time}')
-#
-#     val_loss /= len(val_data_loader)
-#     print(f'Epoch: {epoch+1}/{num_epochs}, Train Loss: {train_loss}, Val Loss: {val_loss}')
-#     train_losses.append(train_loss)
-#     val_losses.append(val_loss)
-#     learning_rates.append(optimizer.param_groups[0]['lr'])
-#
-#     if val_loss < best_val_loss:
-#         best_val_loss = val_loss
-#
-#         if os.path.exists(save_name):
-#             os.remove(save_name)
-#
-#         save_name = f'best_loss_model_{epoch}.pth'
-#         torch.save(model.state_dict(), save_name)
-#
-#     scheduler.step()
-#
-# training_end = time.time()
-# training_time = training_end - training_start
-# print(f'Total training time: {training_time}')
-#
-# plot_and_save(train_losses, val_losses, learning_rates, max_min_loss_diffs)
 
 
 # In[ ]:
