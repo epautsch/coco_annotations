@@ -208,7 +208,7 @@ class ImageCaptioningModel(nn.Module):
 # In[ ]:
 
 
-def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, avg_every):
+def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, num_epochs, avg_every):
     model.train()
     train_loss = 0
     last_x_losses = []
@@ -224,16 +224,16 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch, avg_
         loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
 
         optimizer.step()
 
         train_loss += loss.item()
         last_x_losses.append(loss.item())
 
-        if i % avg_every == 0:
+        if i % avg_every == 0 and i != 0:
             avg_loss = sum(last_x_losses) / len(last_x_losses)
-            print(f'Epoch: {epoch+1}, Iteration: {i}, Loss (last {avg_every} iterations): {avg_loss:.4f}')
+            print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss (last {avg_every} iterations): {avg_loss:.4f}')
     return train_loss / len(dataloader)
 
 def evaluate(model, dataloader, criterion, device):
@@ -383,7 +383,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 100
+num_epochs = 300
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -393,7 +393,7 @@ criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optimizer = optim.Adam(model.parameters(), lr=1e-3)  #, weight_decay=1e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=2000)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
 
@@ -404,16 +404,23 @@ val_losses = []
 learning_rates = []
 
 load_best_model = False
-best_model_path = 'best_loss_model_noam_gradClipping.pt'
+best_model_path = 'best_loss_model_noam.pt'
 if load_best_model and os.path.exists(best_model_path):
     checkpoint = torch.load(best_model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scheduler.__dict__.update(checkpoint['scheduler_state_dict'])
     best_val_loss = checkpoint['best_val_loss']
-    train_losses, val_losses, learning_rates = load_lists_from_file('training_data_noam_gradClipping.pkl')
+    train_losses, val_losses, learning_rates = load_lists_from_file('training_data_noam.pkl')
+    start_epoch = len(train_losses)
+    if start_epoch >= num_epochs:
+        raise ValueError('Number of epochs to train on is too small')
+    training_range = range(start_epoch + 1, num_epochs)
+    print(len(train_losses))
     print('Loaded best saved model...')
     print(f'Validation loss of the loaded model: {best_val_loss:.4f}')
+else:
+    training_range = range(num_epochs)
 
 
 # In[ ]:
@@ -421,7 +428,7 @@ if load_best_model and os.path.exists(best_model_path):
 
 print('**********STARTING TRAINING**********')
 training_start = time.time()
-for epoch in range(num_epochs):
+for epoch in training_range:
     epoch_start = time.time()
 
     epoch_max_loss = float('-inf')
@@ -429,16 +436,17 @@ for epoch in range(num_epochs):
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 100
+    avg_every = 50
     curr_lr = optimizer.param_groups[0]['lr']
     learning_rates.append(curr_lr)
     print(f'**Learning rate set at: {curr_lr}')
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, device, epoch, avg_every)
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, device, epoch, num_epochs, avg_every)
     val_loss = evaluate(model, val_data_loader, criterion, device)
+    print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
     print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
 
     epoch_end = time.time()
-    print(f'Epoch {epoch+1} total time: {epoch_end - epoch_start}')
+    print(f'Epoch {epoch+1}/{num_epochs} total time: {epoch_end - epoch_start}')
 
     train_losses.append(train_loss)
     val_losses.append(val_loss)
@@ -446,14 +454,14 @@ for epoch in range(num_epochs):
     if val_loss < best_val_loss:
         best_val_loss = val_loss
 
-        save_name = f'best_loss_model_noam_gradClipping.pt'
+        save_name = f'best_loss_model_noam.pt'
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.__dict__,
             'best_val_loss': best_val_loss,
         }, save_name)
-        save_lists_to_file('training_data_noam_gradClipping.pkl', train_losses, val_losses, learning_rates)
+        save_lists_to_file('training_data_noam.pkl', train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
     scheduler.step()
