@@ -429,7 +429,7 @@ for epoch in range(num_epochs):
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 25
+    avg_every = 100
     curr_lr = optimizer.param_groups[0]['lr']
     learning_rates.append(curr_lr)
     print(f'**Learning rate set at: {curr_lr}')
