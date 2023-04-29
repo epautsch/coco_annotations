@@ -412,9 +412,10 @@ train_losses = []
 val_losses = []
 learning_rates = []
 
-load_best_model = False
-best_model_path = 'best_loss_model_noam_restart.pt'
-save_lists_path = 'training_data_noam_restart.pkl'
+load_best_model = True
+load_final = True
+best_model_path = 'final_model.pt'
+save_lists_path = 'final_data.pkl'
 if load_best_model and os.path.exists(best_model_path):
     checkpoint = torch.load(best_model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
@@ -463,9 +464,14 @@ for epoch in training_range:
     val_losses.append(val_loss)
 
     if val_loss < best_val_loss:
+        if load_final:
+            save_name = 'best_loss_model_noam_restart.pt'
+            save_lists_path = 'training_data_noam_restart.pkl'
+        else:
+            save_name = best_model_path
+
         best_val_loss = val_loss
 
-        save_name = best_model_path
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
