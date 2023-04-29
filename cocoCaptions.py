@@ -475,8 +475,23 @@ for epoch in training_range:
         save_lists_to_file(save_lists_path, train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
+    if epoch == num_epochs - 1:
+        final_val_loss = val_loss
+        final_save_name = 'final_model.pt'
+        final_save_lists = 'final_data.pkl'
+
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.__dict__,
+            'best_val_loss': final_val_loss,
+        }, final_save_name)
+        save_lists_to_file(final_save_lists, train_losses, val_losses, learning_rates)
+
 training_end = time.time()
 print(f'Total training time: {training_end - training_start}')
+
+
 
 plot_and_save(train_losses, val_losses, learning_rates)
 
