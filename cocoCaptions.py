@@ -373,17 +373,17 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=4,
+                                  num_layers=8,
                                   num_heads=12,
-                                  mlp_dim=512,
+                                  mlp_dim=1024,
                                   num_classes=768).to(device)
 
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=4,
+                                            num_layers=8,
                                             num_heads=12,
-                                            mlp_dim=512).to(device)
+                                            mlp_dim=1024).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
