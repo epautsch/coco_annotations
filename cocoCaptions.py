@@ -164,15 +164,18 @@ class VisionTransformer(nn.Module):
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=20):
         super().__init__()
-        self.encoding = nn.Parameter(torch.zeros(1, max_len, d_model), requires_grad=False)
-
-        pos = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-torch.log(torch.tensor(10000.0)) / d_model))
-        self.encoding[:, :, 0::2] = torch.sin(pos * div_term)
-        self.encoding[:, :, 1::2] = torch.cos(pos * div_term)
+        self.d_model = d_model
+        self.max_len = max_len
 
     def forward(self, x):
-        x = x + self.encoding[:, :x.size(1), :]
+        batch_size, seq_len, d_model = x.size()
+        pos = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-torch.log(torch.tensor(10000.0)) / d_model))
+        encoding = torch.zeros(batch_size, seq_len, d_model, device=x.device)
+        encoding[:, :, 0::2] = torch.sin(pos * div_term)
+        encoding[:, :, 1::2] = torch.cos(pos * div_term)
+
+        x = x + encoding
         return x
 
 
