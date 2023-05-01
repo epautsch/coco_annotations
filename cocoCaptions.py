@@ -303,6 +303,7 @@ def train_one_epoch(model,
         if i % avg_every == 0 and i != 0:
             avg_loss = sum(last_x_losses) / len(last_x_losses)
             print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss (last {avg_every} iterations): {avg_loss:.4f}')
+            last_x_losses = []
     return train_loss / len(dataloader)
 
 def evaluate(model, dataloader, criterion, device):
