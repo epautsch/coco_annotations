@@ -392,7 +392,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 300
+num_epochs = 500
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -426,7 +426,7 @@ if load_best_model and os.path.exists(best_model_path):
     start_epoch = len(train_losses)
     if start_epoch >= num_epochs:
         raise ValueError('Number of epochs to train on is too small')
-    training_range = range(start_epoch + 1, num_epochs)
+    training_range = range(start_epoch, num_epochs)
     print(len(train_losses))
     print('Loaded best saved model...')
     print(f'Validation loss of the loaded model: {best_val_loss:.4f}')
@@ -444,7 +444,7 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 20
+    avg_every = 50
     old_lr = optimizer.param_groups[0]['lr']
 
     train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
