@@ -493,7 +493,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 100
+num_epochs = 50
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -551,7 +551,7 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 100
+    avg_every = 20
     old_lr = optimizer.param_groups[0]['lr']
 
     train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
