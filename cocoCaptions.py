@@ -532,7 +532,8 @@ if load_best_model and os.path.exists(best_model_path):
         model.load_state_dict(adjusted_state_dict)
 
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    scheduler.__dict__.update(checkpoint['scheduler_state_dict'])
+    scheduler.optimizer = optimizer
+    scheduler.current_step = checkpoint['scheduler_state_dict']['current_step']
     best_val_loss = checkpoint['best_val_loss']
     train_losses, val_losses, learning_rates = load_lists_from_file(save_lists_path)
     start_epoch = len(train_losses)
