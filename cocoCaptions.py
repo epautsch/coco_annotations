@@ -297,8 +297,8 @@ def train_one_epoch(model,
         optimizer.step()
         scheduler.step()
 
-        print(f'Iteration: {i}, Learning rate: {optimizer.param_groups[0]["lr"]}, Scheduler step: {scheduler.current_step}')
-
+        # print statement used for debugging optmizer state on reload
+        # print(f'Iteration: {i}, Learning rate: {optimizer.param_groups[0]["lr"]}, Scheduler step: {scheduler.current_step}')
 
         train_loss += loss.item()
         last_x_losses.append(loss.item())
@@ -339,7 +339,8 @@ class NoamScheduler:
     def step(self):
         self.current_step += 1
         lr = self.learning_rate()
-        print(f'NoamScheduler step: {self.current_step}, Learning rate: {lr}')
+        # print line used for debugging optimizer state on reload
+        # print(f'NoamScheduler step: {self.current_step}, Learning rate: {lr}')
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 
