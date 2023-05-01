@@ -554,6 +554,7 @@ for epoch in training_range:
 
     avg_every = 20
     old_lr = optimizer.param_groups[0]['lr']
+    print(old_lr)
 
     train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
