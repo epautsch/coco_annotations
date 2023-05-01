@@ -162,21 +162,23 @@ class VisionTransformer(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=20):
+    def __init__(self, d_model):
         super().__init__()
         self.d_model = d_model
-        self.max_len = max_len
 
     def forward(self, x):
-        batch_size, seq_len, d_model = x.size()
-        pos = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-torch.log(torch.tensor(10000.0)) / d_model))
-        encoding = torch.zeros(batch_size, seq_len, d_model, device=x.device)
+        max_len = x.size(1)
+        encoding = torch.zeros(1, max_len, self.d_model, device=x.device, requires_grad=False)
+
+        pos = torch.arange(0, max_len, dtype=torch.float, device=x.device).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, self.d_model, 2).float() * (-torch.log(torch.tensor(10000.0, device=x.device)) / self.d_model))
         encoding[:, :, 0::2] = torch.sin(pos * div_term)
         encoding[:, :, 1::2] = torch.cos(pos * div_term)
 
         x = x + encoding
         return x
+
+
 
 
 class TransformerCaptionDecoder(nn.Module):
@@ -437,7 +439,7 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 64
+batch_size = 1024
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
@@ -488,7 +490,7 @@ caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
-useTwoGPUs = False
+useTwoGPUs = True
 if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
