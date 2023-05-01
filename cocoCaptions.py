@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import math
@@ -24,7 +24,7 @@ from transformers import AutoTokenizer, AutoModel
 from tqdm import tqdm
 
 
-# In[2]:
+# In[ ]:
 
 
 # import numpy as np
@@ -43,7 +43,7 @@ from tqdm import tqdm
 # plt.show()
 
 
-# In[3]:
+# In[ ]:
 
 
 image_transform = Compose([
@@ -54,7 +54,7 @@ image_transform = Compose([
 ])
 
 
-# In[80]:
+# In[ ]:
 
 
 class CaptionPreprocessor:
@@ -97,7 +97,7 @@ class CaptionPreprocessor:
         return std_dev
 
 
-# In[81]:
+# In[ ]:
 
 
 class CustomCocoDataset(Dataset):
@@ -121,7 +121,7 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[82]:
+# In[ ]:
 
 
 class PatchEmbedding(nn.Module):
@@ -158,7 +158,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[83]:
+# In[ ]:
 
 
 class PositionalEncoding(nn.Module):
@@ -200,7 +200,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[84]:
+# In[ ]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -260,7 +260,7 @@ class ImageCaptioningModel(nn.Module):
 
 
 
-# In[85]:
+# In[ ]:
 
 
 def train_one_epoch(model,
@@ -319,7 +319,7 @@ def evaluate(model, dataloader, criterion, device):
     return val_loss / len(dataloader)
 
 
-# In[86]:
+# In[ ]:
 
 
 class NoamScheduler:
@@ -341,7 +341,7 @@ class NoamScheduler:
         return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
-# In[87]:
+# In[ ]:
 
 
 def plot_and_save(train_losses, val_losses, learning_rates):
@@ -369,7 +369,7 @@ def plot_and_save(train_losses, val_losses, learning_rates):
     fig.savefig('learning_rates.png')
 
 
-# In[88]:
+# In[ ]:
 
 
 def save_lists_to_file(file_path, train_losses, val_losses, learning_rates):
@@ -388,7 +388,7 @@ def load_lists_from_file(file_path):
     return data['train_losses'], data['val_losses'], data['learning_rates']
 
 
-# In[89]:
+# In[ ]:
 
 
 # Needed when running inference on laptop
@@ -400,7 +400,7 @@ def adjust_state_dict_keys(state_dict):
     return new_state_dict
 
 
-# In[90]:
+# In[ ]:
 
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'
@@ -434,12 +434,12 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 256
+batch_size = 16
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
 
-# In[92]:
+# In[ ]:
 
 
 import numpy as np
@@ -462,7 +462,7 @@ def display_random_sample(dataset, tokenizer):
 # display_random_sample(custom_train_dataset, tokenizer)
 
 
-# In[73]:
+# In[ ]:
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -485,7 +485,7 @@ caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
-useTwoGPUs = True
+useTwoGPUs = False
 if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
@@ -548,7 +548,7 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 20
+    avg_every = 100
     old_lr = optimizer.param_groups[0]['lr']
 
     train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
