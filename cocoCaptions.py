@@ -182,11 +182,11 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, max_len=20):
+    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim):
         super().__init__()
 
         self.auto_model = auto_model
-        self.positional_encoding = PositionalEncoding(d_model, max_len)
+        self.positional_encoding = PositionalEncoding(d_model)
         self.transformer_layers = nn.ModuleList([
             nn.TransformerDecoderLayer(d_model, num_heads, mlp_dim)
             for _ in range(num_layers)
