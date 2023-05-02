@@ -510,7 +510,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 50
+num_epochs = 80
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -530,10 +530,10 @@ train_losses = []
 val_losses = []
 learning_rates = []
 
-load_best_model = False
-load_final = False
-best_model_path = 'best_model_monday_2.pt'
-save_lists_path = 'best_data_monday_2.pkl'
+load_best_model = True
+load_final = True
+best_model_path = 'final_model_monday_2.pt'
+save_lists_path = 'final_data_monday_2.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
