@@ -27,25 +27,6 @@ from tqdm import tqdm
 # In[ ]:
 
 
-# import numpy as np
-# lr = 1e-2
-# epochs = 300
-# eps = []
-# lrs = []
-# for i in range(epochs):
-#     eps.append(i)
-#     lrs.append(lr)
-#     lr *= 0.9
-#
-# fig, ax = plt.subplots()
-# ax.plot(eps, lrs)
-# ax.set_yscale('log')
-# plt.show()
-
-
-# In[ ]:
-
-
 image_transform = Compose([
     Resize((224, 224)),
     ToTensor(),
@@ -58,7 +39,7 @@ image_transform = Compose([
 
 
 class CaptionPreprocessor:
-    def __init__(self, captions, tokenizer, max_caption_length=20):
+    def __init__(self, captions, tokenizer, max_caption_length=14):
         self.tokenizer = tokenizer
         self.max_caption_length = max_caption_length
         self.total_caption_length = 0
@@ -233,7 +214,7 @@ class ImageCaptioningModel(nn.Module):
         return output
 
     # used for inference with test dataset
-    def sample(self, images, max_len=20):
+    def sample(self, images, max_len=14):
         with torch.no_grad():
             image_features = self.image_encoder(images)
             num_patches = (224 // 16) * (224 // 16)
@@ -330,7 +311,7 @@ def evaluate(model, dataloader, criterion, device):
 
 
 class NoamScheduler:
-    def __init__(self, optimizer, d_model, warmup_steps=4000):
+    def __init__(self, optimizer, d_model, warmup_steps=2000):
         self.optimizer = optimizer
         self.d_model = d_model
         self.warmup_steps = warmup_steps
@@ -348,6 +329,36 @@ class NoamScheduler:
         arg1 = self.current_step ** -0.5
         arg2 = min(self.current_step * self.warmup_steps ** -1.5, 1)
         return (self.d_model ** -0.5) * min(arg1, arg2)
+
+
+# In[ ]:
+
+
+# # dummy optimizer for graphing purposes
+# dummy_param = torch.nn.Parameter(torch.zeros(1))
+# optim = optim.Adam([dummy_param], lr=0.0)
+#
+# # Create a NoamScheduler instance
+# d_model = 768
+# warmup_steps = 4000
+# sched = NoamScheduler(optim, d_model, warmup_steps)
+#
+# num_steps = 162*150
+# steps = []
+# learning_rates = []
+#
+# for step in range(1, num_steps + 1):
+#     sched.step()
+#     lr = sched.learning_rate()
+#     steps.append(step)
+#     learning_rates.append(lr)
+#
+# plt.plot(steps, learning_rates)
+# plt.xlabel('Steps')
+# plt.ylabel('Learning Rate')
+# plt.title('Noam Learning Rate Schedule')
+# plt.grid()
+# plt.show()
 
 
 # In[ ]:
@@ -443,7 +454,7 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 512
+batch_size = 256
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
@@ -468,7 +479,7 @@ def display_random_sample(dataset, tokenizer):
     plt.show()
 
 # Display a random sample from the training dataset
-# display_random_sample(custom_train_dataset, tokenizer)
+display_random_sample(custom_train_dataset, tokenizer)
 
 
 # In[ ]:
@@ -480,17 +491,17 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=4,
-                                  num_heads=8,
-                                  mlp_dim=256,
+                                  num_layers=12,
+                                  num_heads=16,
+                                  mlp_dim=1024,
                                   num_classes=768).to(device)
 
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=4,
-                                            num_heads=8,
-                                            mlp_dim=256).to(device)
+                                            num_layers=12,
+                                            num_heads=16,
+                                            mlp_dim=1024).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
@@ -499,7 +510,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 150
+num_epochs = 50
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -509,7 +520,7 @@ criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optimizer = optim.Adam(model.parameters(), lr=0)  #, weight_decay=1e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=2000)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
 
@@ -598,7 +609,7 @@ for epoch in training_range:
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
 
     if epoch == num_epochs - 1:
-        final_val_loss = val_loss
+        final_val_loss = best_val_loss
         final_save_name = 'final_model_monday.pt'
         final_save_lists = 'final_data_monday.pkl'
 
@@ -637,7 +648,7 @@ plot_and_save(train_losses, val_losses, learning_rates)
 #     with torch.no_grad():
 #         image = image.unsqueeze(0).to(device)
 #         generated_caption = model.sample(image, max_len)
-#         decoded_caption = tokenizer.decode(generated_caption.squeeze().tolist(), skip_special_tokens=True)
+#         decoded_caption = tokenizer.decode(generated_caption.squeeze().tolist(), skip_special_tokens=False)
 #     return decoded_caption
 
 
@@ -649,4 +660,10 @@ plot_and_save(train_losses, val_losses, learning_rates)
 #
 # generated_caption = generate_caption(model, image, tokenizer, device)
 # print('Generated caption:', generated_caption)
+
+
+# In[ ]:
+
+
+
 
