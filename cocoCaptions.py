@@ -530,10 +530,10 @@ train_losses = []
 val_losses = []
 learning_rates = []
 
-load_best_model = True
-load_final = True
-best_model_path = 'final_model_monday.pt'
-save_lists_path = 'final_data_monday.pkl'
+load_best_model = False
+load_final = False
+best_model_path = 'best_model_monday_2.pt'
+save_lists_path = 'best_data_monday_2.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
@@ -592,8 +592,8 @@ for epoch in training_range:
 
     if val_loss < best_val_loss:
         if load_final:
-            save_name = 'best_loss_model_noam_restart.pt'
-            save_lists_path = 'training_data_noam_restart.pkl'
+            save_name = 'best_model_monday_2.pt'
+            save_lists_path = 'best_data_monday_2.pkl'
         else:
             save_name = best_model_path
 
@@ -610,8 +610,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'final_model_monday.pt'
-        final_save_lists = 'final_data_monday.pkl'
+        final_save_name = 'final_model_monday_2.pt'
+        final_save_lists = 'final_data_monday_2.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
