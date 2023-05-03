@@ -216,10 +216,11 @@ class ImageCaptioningModel(nn.Module):
             captions_output[:, 0] = start_token_tensor
             for t in range(1, captions.size(1)):
                 captions_input = captions_output[:, :t].to(device)
-                output = self.caption_decoder(captions_input, memory)
+                output = self.caption_decoder(captions_input, memory[:, :t])
                 captions_output[:, t] = output[:, -1].argmax(-1)
 
         return captions_output
+
 
     # used for inference with test dataset
     def sample(self, model, image, max_length, start_token, device):
