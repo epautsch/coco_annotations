@@ -199,7 +199,7 @@ class ImageCaptioningModel(nn.Module):
     def forward(self, images, captions, teacher_forcing=True):
         image_features = self.image_encoder(images)
         num_patches = (224 // 16) * (224 // 16)
-        image_features_flattened = image_features.permute(1, 0, 2).reshape(-1, num_patches, self.embedding_size)
+        image_features_flattened = image_features.permute(0, 2, 1).view(-1, num_patches, self.embedding_size)
 
         start_token_tensor = torch.tensor([self.start_token_index], dtype=torch.long, device=images.device)
         start_token_embeddings = self.caption_decoder.auto_model.embeddings(start_token_tensor).repeat(image_features.shape[0], 1, 1) # getting start token embedding and repeating it for batch size
@@ -220,6 +220,7 @@ class ImageCaptioningModel(nn.Module):
                 captions_output[:, t] = output[:, -1].argmax(-1)
 
         return captions_output
+
 
 
     # used for inference with test dataset
