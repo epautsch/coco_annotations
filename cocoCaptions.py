@@ -174,9 +174,6 @@ class TransformerCaptionDecoder(nn.Module):
         init.xavier_uniform_(self.output_layer.weight)
 
     def forward(self, captions, memory):
-        print("captions shape (before layer call):", captions.shape)
-        print("memory shape (before layer call):", memory.shape)
-
         captions = self.auto_model.embeddings(captions)
         captions = self.positional_encoding(captions)
 
@@ -202,35 +199,27 @@ class ImageCaptioningModel(nn.Module):
     def forward(self, images, captions, teacher_forcing=True):
         image_features = self.image_encoder(images)
         num_patches = (224 // 16) * (224 // 16)
-        image_features_flattened = image_features.permute(0, 2, 1).reshape(-1, num_patches, self.embedding_size)
-
-        print("images shape:", images.shape)
-        print("captions shape:", captions.shape)
-        print("image_features shape:", image_features.shape)
-        print("image_features_flattened shape:", image_features_flattened.shape)
+        # image_features_flattened = image_features.permute(1, 0, 2).reshape(-1, num_patches, self.embedding_size)
 
         start_token_tensor = torch.tensor([self.start_token_index], dtype=torch.long, device=images.device)
         start_token_embeddings = self.caption_decoder.auto_model.embeddings(start_token_tensor).repeat(image_features.shape[0], 1, 1) # getting start token embedding and repeating it for batch size
-        memory = torch.cat([start_token_embeddings, image_features_flattened], dim=1) # Concatenate the start token embeddings with the flattened image features
+        image_features_summed = image_features.sum(dim=1).unsqueeze(1)
+        image_features_summed = self.image_feature_linear(image_features_summed)
+        memory = torch.cat([start_token_embeddings, image_features_summed], dim=1) # Concatenate the start token embeddings with the flattened image features
+        memory = memory.transpose(0, 1)
 
         if teacher_forcing:
             captions_input = captions[:, :-1].to(device)
-            memory = memory[:, :captions_input.size(1) + 1, :] # Truncate the memory tensor's sequence length to match the captions_input tensor's sequence length
-            memory = memory.transpose(0, 1)
             captions_output = self.caption_decoder(captions_input, memory)
         else:
             captions_output = torch.zeros_like(captions).to(device)
             captions_output[:, 0] = start_token_tensor
             for t in range(1, captions.size(1)):
                 captions_input = captions_output[:, :t].to(device)
-                memory_t = memory[:, :t + 1, :]
-                memory_t = memory_t.transpose(0, 1)
-                output = self.caption_decoder(captions_input, memory_t)
+                output = self.caption_decoder(captions_input, memory)
                 captions_output[:, t] = output[:, -1].argmax(-1)
 
         return captions_output
-
-
 
     # used for inference with test dataset
     def sample(self, model, image, max_length, start_token, device):
@@ -274,9 +263,8 @@ def train_one_epoch(model,
     train_loss = 0
     last_x_losses = []
     for i, (images, captions) in enumerate(tqdm(dataloader, desc='Training')):
-    # for i, (images, captions) in enumerate(dataloader):
         images = images.to(device)
-        captions_input = captions[:, :-1].to(device)
+        captions_input = captions.to(device)
         captions_target = captions[:, 1:].to(device)
 
         optimizer.zero_grad()
@@ -286,8 +274,6 @@ def train_one_epoch(model,
 
         loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
         loss.backward()
-
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
 
         learning_rates.append(optimizer.param_groups[0]['lr'])
         optimizer.step()
@@ -302,6 +288,7 @@ def train_one_epoch(model,
             last_x_losses = []
 
     return train_loss / len(dataloader)
+
 
 def evaluate(model, dataloader, criterion, device):
     model.eval()
@@ -586,7 +573,7 @@ for epoch in training_range:
     old_lr = optimizer.param_groups[0]['lr']
     print(old_lr, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every,learning_rates)
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
