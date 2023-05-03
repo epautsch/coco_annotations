@@ -212,21 +212,24 @@ class ImageCaptioningModel(nn.Module):
         start_token_tensor = torch.tensor([self.start_token_index], dtype=torch.long, device=images.device)
         start_token_embeddings = self.caption_decoder.auto_model.embeddings(start_token_tensor).repeat(image_features.shape[0], 1, 1) # getting start token embedding and repeating it for batch size
         memory = torch.cat([start_token_embeddings, image_features_flattened], dim=1) # Concatenate the start token embeddings with the flattened image features
-        memory = memory.transpose(0, 1)
 
         if teacher_forcing:
             captions_input = captions[:, :-1].to(device)
             memory = memory[:, :captions_input.size(1) + 1, :] # Truncate the memory tensor's sequence length to match the captions_input tensor's sequence length
+            memory = memory.transpose(0, 1)
             captions_output = self.caption_decoder(captions_input, memory)
         else:
             captions_output = torch.zeros_like(captions).to(device)
             captions_output[:, 0] = start_token_tensor
             for t in range(1, captions.size(1)):
                 captions_input = captions_output[:, :t].to(device)
-                output = self.caption_decoder(captions_input, memory[:t])
+                memory_t = memory[:, :t + 1, :]
+                memory_t = memory_t.transpose(0, 1)
+                output = self.caption_decoder(captions_input, memory_t)
                 captions_output[:, t] = output[:, -1].argmax(-1)
 
         return captions_output
+
 
 
     # used for inference with test dataset
