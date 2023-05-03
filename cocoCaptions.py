@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import math
@@ -24,7 +24,7 @@ from transformers import AutoTokenizer, AutoModel
 from tqdm import tqdm
 
 
-# In[ ]:
+# In[2]:
 
 
 image_transform = Compose([
@@ -35,7 +35,7 @@ image_transform = Compose([
 ])
 
 
-# In[ ]:
+# In[3]:
 
 
 class CaptionPreprocessor:
@@ -78,7 +78,7 @@ class CaptionPreprocessor:
         return std_dev
 
 
-# In[ ]:
+# In[4]:
 
 
 class CustomCocoDataset(Dataset):
@@ -102,7 +102,7 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[ ]:
+# In[5]:
 
 
 class PatchEmbedding(nn.Module):
@@ -139,7 +139,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[ ]:
+# In[6]:
 
 
 class PositionalEncoding(nn.Module):
@@ -184,7 +184,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[ ]:
+# In[7]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -196,7 +196,7 @@ class ImageCaptioningModel(nn.Module):
         self.embedding_size = caption_decoder.auto_model.config.hidden_size
         self.image_feature_linear = nn.Linear(768, self.embedding_size)
 
-    def forward(self, images, captions):
+    def forward(self, images, captions, teacher_forcing=True):
         image_features = self.image_encoder(images)
         num_patches = (224 // 16) * (224 // 16)
         # image_features_flattened = image_features.permute(1, 0, 2).reshape(-1, num_patches, self.embedding_size)
@@ -206,46 +206,47 @@ class ImageCaptioningModel(nn.Module):
         image_features_summed = image_features.sum(dim=1).unsqueeze(1)
         image_features_summed = self.image_feature_linear(image_features_summed)
         memory = torch.cat([start_token_embeddings, image_features_summed], dim=1) # Concatenate the start token embeddings with the flattened image features
-
         memory = memory.transpose(0, 1)
-        captions = captions.transpose(0, 1)
 
-        output = self.caption_decoder(captions, memory)
-        return output
+        if teacher_forcing:
+            captions_input = captions[:, :-1].to(device)
+            captions_output = self.caption_decoder(captions_input, memory)
+        else:
+            captions_output = torch.zeros_like(captions).to(device)
+            captions_output[:, 0] = start_token_tensor
+            for t in range(1, captions.size(1)):
+                captions_input = captions_output[:, :t].to(device)
+                output = self.caption_decoder(captions_input, memory)
+                captions_output[:, t] = output[:, -1].argmax(-1)
+
+        return captions_output
 
     # used for inference with test dataset
-    def sample(self, images, max_len=14):
+    def sample(model, image, max_length, start_token, device):
+        model.eval()
+
         with torch.no_grad():
-            image_features = self.image_encoder(images)
-            num_patches = (224 // 16) * (224 // 16)
+            image = image.unsqueeze(0).to(device)
+            memory = model.image_encoder(image)
 
-            start_token_tensor = torch.tensor([self.start_token_index], dtype=torch.long, device=images.device)
-            start_token_embeddings = self.caption_decoder.auto_model.embeddings(start_token_tensor).repeat(image_features.shape[0], 1, 1)
-            image_features_summed = image_features.sum(dim=1).unsqueeze(1)
-            image_features_summed = self.image_feature_linear(image_features_summed)
-            memory = torch.cat([start_token_embeddings, image_features_summed], dim=1)
-            memory = memory.transpose(0, 1)
+            captions_output = torch.zeros((1, max_length)).long().to(device)
+            captions_output[:, 0] = start_token
 
-            input_ids = start_token_tensor.unsqueeze(1).repeat(1, image_features.shape[0]).transpose(0, 1)
+            for t in range(1, max_length):
+                captions_input = captions_output[:, :t].to(device)
+                output = model.caption_decoder(captions_input, memory)
+                captions_output[:, t] = output[:, -1].argmax(-1)
 
-            for _ in range(max_len - 1):
-                captions = torch.full((1, 1), self.start_token_index, dtype=torch.long, device=images.device)
-                captions = self.caption_decoder.positional_encoding(captions)
-
-                for layer in self.caption_decoder.transformer_layers:
-                    captions = layer(captions, memory)
-
-                logits = self.caption_decoder.output_layer(captions)
-                next_token_logits = logits[:, -1, :]
-                next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(1)
-                input_ids = torch.cat([input_ids, next_token], dim=-1)
-
-            return input_ids
+        return captions_output.squeeze(0).cpu().numpy()
 
 
 
-# In[ ]:
 
+# In[8]:
+
+
+def use_teacher_forcing(teacher_forcing_ratio):
+    return random.random() < teacher_forcing_ratio
 
 def train_one_epoch(model,
                     dataloader,
@@ -256,7 +257,8 @@ def train_one_epoch(model,
                     epoch,
                     num_epochs,
                     avg_every,
-                    learning_rates):
+                    learning_rates,
+                    teacher_forcing_ratio=0.5):
     model.train()
     train_loss = 0
     last_x_losses = []
@@ -267,7 +269,9 @@ def train_one_epoch(model,
         captions_target = captions[:, 1:].to(device)
 
         optimizer.zero_grad()
-        output = model(images, captions_input)
+
+        use_tf = use_teacher_forcing(teacher_forcing_ratio)
+        output = model(images, captions_input, teacher_forcing=use_tf)
 
         loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
         loss.backward()
@@ -278,9 +282,6 @@ def train_one_epoch(model,
         optimizer.step()
         scheduler.step()
 
-        # print statement used for debugging optmizer state on reload
-        # print(f'Iteration: {i}, Learning rate: {optimizer.param_groups[0]["lr"]}, Scheduler step: {scheduler.current_step}')
-
         train_loss += loss.item()
         last_x_losses.append(loss.item())
 
@@ -288,6 +289,7 @@ def train_one_epoch(model,
             avg_loss = sum(last_x_losses) / len(last_x_losses)
             print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss (last {avg_every} iterations): {avg_loss:.4f}')
             last_x_losses = []
+
     return train_loss / len(dataloader)
 
 def evaluate(model, dataloader, criterion, device):
@@ -307,11 +309,11 @@ def evaluate(model, dataloader, criterion, device):
     return val_loss / len(dataloader)
 
 
-# In[ ]:
+# In[9]:
 
 
 class NoamScheduler:
-    def __init__(self, optimizer, d_model, warmup_steps=2000):
+    def __init__(self, optimizer, d_model, warmup_steps=4000):
         self.optimizer = optimizer
         self.d_model = d_model
         self.warmup_steps = warmup_steps
@@ -331,7 +333,7 @@ class NoamScheduler:
         return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
-# In[ ]:
+# In[10]:
 
 
 # # dummy optimizer for graphing purposes
@@ -361,7 +363,7 @@ class NoamScheduler:
 # plt.show()
 
 
-# In[ ]:
+# In[11]:
 
 
 def plot_and_save(train_losses, val_losses, learning_rates):
@@ -389,7 +391,7 @@ def plot_and_save(train_losses, val_losses, learning_rates):
     fig.savefig('learning_rates.png')
 
 
-# In[ ]:
+# In[12]:
 
 
 def save_lists_to_file(file_path, train_losses, val_losses, learning_rates):
@@ -408,7 +410,7 @@ def load_lists_from_file(file_path):
     return data['train_losses'], data['val_losses'], data['learning_rates']
 
 
-# In[ ]:
+# In[13]:
 
 
 # Needed when running inference on laptop
@@ -420,7 +422,7 @@ def adjust_state_dict_keys(state_dict):
     return new_state_dict
 
 
-# In[ ]:
+# In[14]:
 
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'
@@ -454,12 +456,12 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 128
+batch_size = 256
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
 
-# In[ ]:
+# In[15]:
 
 
 import numpy as np
@@ -479,10 +481,10 @@ def display_random_sample(dataset, tokenizer):
     plt.show()
 
 # Display a random sample from the training dataset
-display_random_sample(custom_train_dataset, tokenizer)
+# display_random_sample(custom_train_dataset, tokenizer)
 
 
-# In[ ]:
+# In[16]:
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -491,7 +493,7 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=12,
+                                  num_layers=6,
                                   num_heads=16,
                                   mlp_dim=1024,
                                   num_classes=768).to(device)
@@ -499,7 +501,7 @@ image_encoder = VisionTransformer(in_channels=3,
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=12,
+                                            num_layers=6,
                                             num_heads=16,
                                             mlp_dim=1024).to(device)
 
@@ -510,7 +512,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 80
+num_epochs = 100
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -520,7 +522,7 @@ criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optimizer = optim.Adam(model.parameters(), lr=0)  #, weight_decay=1e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=2000)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
 
@@ -530,10 +532,10 @@ train_losses = []
 val_losses = []
 learning_rates = []
 
-load_best_model = True
-load_final = True
-best_model_path = 'final_model_monday_2.pt'
-save_lists_path = 'final_data_monday_2.pkl'
+load_best_model = False
+load_final = False
+best_model_path = 'teacher_forcing_attempt_1.pt'
+save_lists_path = 'teacher_forcing_attempt_1.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
@@ -569,11 +571,11 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 20
+    avg_every = 1
     old_lr = optimizer.param_groups[0]['lr']
     print(old_lr, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every,learning_rates)
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -581,8 +583,8 @@ for epoch in training_range:
         print(f'****LR changed from {old_lr} ==> {new_lr}****')
 
     val_loss = evaluate(model, val_data_loader, criterion, device)
-    print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
     print(f'CURRENT BEST VALIDATION LOSS: {best_val_loss:.4f}')
+    print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
 
     epoch_end = time.time()
     print(f'Epoch {epoch+1}/{num_epochs} total time: {epoch_end - epoch_start}')
@@ -610,8 +612,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'final_model_monday_2.pt'
-        final_save_lists = 'final_data_monday_2.pkl'
+        final_save_name = 'teacher_forcing_attempt_1_FINAL.pt'
+        final_save_lists = 'teacher_forcing_attempt_1+FINAL.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
