@@ -139,7 +139,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[6]:
+# In[1]:
 
 
 class PositionalEncoding(nn.Module):
@@ -174,6 +174,9 @@ class TransformerCaptionDecoder(nn.Module):
         init.xavier_uniform_(self.output_layer.weight)
 
     def forward(self, captions, memory):
+        print("captions shape (before layer call):", captions.shape)
+        print("memory shape (before layer call):", memory.shape)
+
         captions = self.auto_model.embeddings(captions)
         captions = self.positional_encoding(captions)
 
