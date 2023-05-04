@@ -156,7 +156,7 @@ class PositionalEncoding(nn.Module):
         encoding[:, :, 0::2] = torch.sin(pos * div_term)
         encoding[:, :, 1::2] = torch.cos(pos * div_term)
 
-        x = x + encoding
+        x = x.add(encoding)
         return x
 
 
@@ -174,11 +174,13 @@ class TransformerCaptionDecoder(nn.Module):
         init.xavier_uniform_(self.output_layer.weight)
 
     def forward(self, captions, memory):
-        captions = self.auto_model.embeddings(captions)
-        captions = self.positional_encoding(captions)
+        captions = self.auto_model.get_input_embeddings()(captions)
+        captions = self.positional_encoding(captions).detach()
+
+        memory = memory.transpose(0, 1)
 
         for layer in self.transformer_layers:
-            captions = layer(captions, memory)
+            captions = layer(captions, memory[:, :captions.size(1), :])
 
         logits = self.output_layer(captions)
         return logits
@@ -205,7 +207,7 @@ class ImageCaptioningModel(nn.Module):
         start_token_embeddings = self.caption_decoder.auto_model.embeddings(start_token_tensor).repeat(image_features.shape[0], 1, 1) # getting start token embedding and repeating it for batch size
         image_features_summed = image_features.sum(dim=1).unsqueeze(1)
         image_features_summed = self.image_feature_linear(image_features_summed)
-        memory = torch.cat([start_token_embeddings, image_features_summed], dim=1) # Concatenate the start token embeddings with the flattened image features
+        memory = torch.cat([start_token_embeddings, image_features_summed], dim=1) # Concat the start token embeddings with the flattened image features
         memory = memory.transpose(0, 1)
 
         if teacher_forcing:
@@ -213,11 +215,15 @@ class ImageCaptioningModel(nn.Module):
             captions_output = self.caption_decoder(captions_input, memory)
         else:
             captions_output = torch.zeros_like(captions).to(device)
+            logits_output = torch.zeros((captions.size(0), captions.size(1), self.caption_decoder.auto_model.config.vocab_size), device=device)
             captions_output[:, 0] = start_token_tensor
             for t in range(1, captions.size(1)):
                 captions_input = captions_output[:, :t].to(device)
-                output = self.caption_decoder(captions_input, memory[:, :t])
-                captions_output[:, t] = output[:, -1].argmax(-1)
+                logits = self.caption_decoder(captions_input, memory[:, :t].clone())
+                logits_output[:, t] = logits[:, -1]
+                captions_output[:, t] = logits[:, -1].argmax(-1)
+
+            captions_output = logits_output
 
         return captions_output
 
@@ -241,13 +247,12 @@ class ImageCaptioningModel(nn.Module):
         return captions_output.squeeze(0).cpu().numpy()
 
 
-
-
 # In[8]:
 
 
 def use_teacher_forcing(teacher_forcing_ratio):
-    return random.random() < teacher_forcing_ratio
+    return random.random() < float(teacher_forcing_ratio)
+
 
 def train_one_epoch(model,
                     dataloader,
@@ -260,20 +265,27 @@ def train_one_epoch(model,
                     avg_every,
                     learning_rates,
                     teacher_forcing_ratio=0.5):
+    torch.autograd.set_detect_anomaly(True)
+
     model.train()
     train_loss = 0
     last_x_losses = []
     for i, (images, captions) in enumerate(tqdm(dataloader, desc='Training')):
         images = images.to(device)
         captions_input = captions.to(device)
-        captions_target = captions[:, 1:].to(device)
+
+        use_tf = use_teacher_forcing(teacher_forcing_ratio)
 
         optimizer.zero_grad()
 
-        use_tf = use_teacher_forcing(teacher_forcing_ratio)
         output = model(images, captions_input, teacher_forcing=use_tf)
 
-        loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
+        if use_tf:
+            captions_target = captions[:, 1:-1].to(device)
+        else:
+            captions_target = captions[:, 1:].to(device)
+
+        loss = criterion(output[:, 1:].reshape(-1, output.shape[-1]), captions_target.view(-1))
         loss.backward()
 
         learning_rates.append(optimizer.param_groups[0]['lr'])
@@ -455,7 +467,7 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 256
+batch_size = 384
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
@@ -492,7 +504,7 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=6,
+                                  num_layers=4,
                                   num_heads=16,
                                   mlp_dim=1024,
                                   num_classes=768).to(device)
@@ -500,7 +512,7 @@ image_encoder = VisionTransformer(in_channels=3,
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=6,
+                                            num_layers=4,
                                             num_heads=16,
                                             mlp_dim=1024).to(device)
 
@@ -570,7 +582,7 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 1
+    avg_every = 10
     old_lr = optimizer.param_groups[0]['lr']
     print(old_lr, scheduler.current_step)
 
