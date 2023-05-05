@@ -561,7 +561,7 @@ criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=5e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000, scaling_factor=0.5)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=2000, scaling_factor=0.35)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
@@ -641,7 +641,7 @@ for epoch in training_range:
     # tf scheduler
     old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     tf_scheduler.step(val_loss, scheduler.current_step)
-    new_tf_ratio = tf_scheduler
+    new_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     if old_tf_ratio != new_tf_ratio:
         print(f'****TF RATIO CHANGED FROM {old_tf_ratio} ==> {new_tf_ratio}****')
 
