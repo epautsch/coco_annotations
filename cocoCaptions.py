@@ -161,13 +161,13 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim):
+    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.1):
         super().__init__()
 
         self.auto_model = auto_model
         self.positional_encoding = PositionalEncoding(d_model)
         self.transformer_layers = nn.ModuleList([
-            nn.TransformerDecoderLayer(d_model, num_heads, mlp_dim)
+            nn.TransformerDecoderLayer(d_model, num_heads, mlp_dim, dropout=dropout)
             for _ in range(num_layers)
         ])
         self.output_layer = nn.Linear(d_model, self.auto_model.config.vocab_size)
@@ -525,19 +525,19 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 100
+num_epochs = 50
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=1e-5)
+optimizer = optim.Adam(model.parameters(), lr=5e-5, weight_decay=1e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=20000)
-# scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
-# scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int(num_epochs / 5), eta_min=1e-6)
+# scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=20000)
+# scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
+scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
 best_val_loss = float('inf')
 
@@ -547,8 +547,8 @@ learning_rates = []
 
 load_best_model = False
 load_final = False
-best_model_path = 'teacher_forcing_attempt_1.pt'
-save_lists_path = 'teacher_forcing_attempt_1.pkl'
+best_model_path = 'teacher_forcing_attempt_2.pt'
+save_lists_path = 'teacher_forcing_attempt_2.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
@@ -560,7 +560,8 @@ if load_best_model and os.path.exists(best_model_path):
 
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scheduler.optimizer = optimizer
-    scheduler.current_step = checkpoint['scheduler_state_dict']['current_step']
+    # scheduler.current_step = checkpoint['scheduler_state_dict']['current_step'] # use with noam
+    scheduler.state_dict = checkpoint['scheduler_state_dict']
     best_val_loss = checkpoint['best_val_loss']
     train_losses, val_losses, learning_rates = load_lists_from_file(save_lists_path)
     start_epoch = len(train_losses)
@@ -584,7 +585,7 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 10
+    avg_every = 50
     old_lr = optimizer.param_groups[0]['lr']
     print(old_lr, scheduler.current_step)
 
@@ -617,7 +618,8 @@ for epoch in training_range:
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.__dict__,
+            # 'scheduler_state_dict': scheduler.__dict__, # use with noam
+            'scheduler_state_dict': scheduler.state_dict(),
             'best_val_loss': best_val_loss,
         }, save_name)
         save_lists_to_file(save_lists_path, train_losses, val_losses, learning_rates)
@@ -625,13 +627,14 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'teacher_forcing_attempt_1_FINAL.pt'
-        final_save_lists = 'teacher_forcing_attempt_1+FINAL.pkl'
+        final_save_name = 'teacher_forcing_attempt_2_FINAL.pt'
+        final_save_lists = 'teacher_forcing_attempt_2_FINAL.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.__dict__,
+            # 'scheduler_state_dict': scheduler.__dict__, # use with noam
+            'scheduler_state_dict': scheduler.state_dict(),
             'best_val_loss': final_val_loss,
         }, final_save_name)
         save_lists_to_file(final_save_lists, train_losses, val_losses, learning_rates)
