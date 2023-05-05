@@ -373,7 +373,7 @@ class TeacherForcingScheduler:
         self.max_epochs = max_epochs
         self.initial_teacher_forcing_ratio = initial_teacher_forcing_ratio
         self.curr_teacher_forcing_ratio = initial_teacher_forcing_ratio
-        self.best_val_loss = 0.0
+        self.best_val_loss = float('inf')
         self.epochs_since_best_val_loss_set = 0
         self.warmup_steps = warmup_steps
         self.tf_history = []
@@ -569,6 +569,7 @@ scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=2500, scaling_fac
 tf_scheduler = TeacherForcingScheduler(num_epochs)
 
 best_val_loss = float('inf')
+val_loss = float('inf')
 
 train_losses = []
 val_losses = []
