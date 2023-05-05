@@ -118,13 +118,13 @@ class PatchEmbedding(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    def __init__(self, in_channels, patch_size, embed_dim, num_layers, num_heads, mlp_dim, num_classes):
+    def __init__(self, in_channels, patch_size, embed_dim, num_layers, num_heads, mlp_dim, num_classes, dropout=0.5):
         super().__init__()
         self.patch_embed = PatchEmbedding(patch_size, in_channels, embed_dim)
         self.positional_encoding = nn.Parameter(torch.randn(1, (224 // patch_size) * (224 // patch_size) + 1, embed_dim))
 
         self.transformer_layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(embed_dim, num_heads, mlp_dim)
+            nn.TransformerEncoderLayer(embed_dim, num_heads, mlp_dim, dropout=dropout)
             for _ in range(num_layers)
         ])
 
@@ -264,7 +264,7 @@ def train_one_epoch(model,
                     num_epochs,
                     avg_every,
                     learning_rates,
-                    step,
+                    stepCounter=None,
                     teacher_forcing_ratio=0.5):
     torch.autograd.set_detect_anomaly(True)
 
@@ -292,7 +292,7 @@ def train_one_epoch(model,
         learning_rates.append(optimizer.param_groups[0]['lr'])
         optimizer.step()
         scheduler.step()
-        step.addAstep()
+        # step.addAstep() # use with other schedulers
 
         train_loss += loss.item()
         last_x_losses.append(loss.item())
@@ -522,16 +522,16 @@ image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
                                   num_layers=4,
-                                  num_heads=16,
-                                  mlp_dim=1024,
+                                  num_heads=8,
+                                  mlp_dim=512,
                                   num_classes=768).to(device)
 
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
                                             num_layers=4,
-                                            num_heads=16,
-                                            mlp_dim=1024).to(device)
+                                            num_heads=8,
+                                            mlp_dim=512).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
@@ -540,19 +540,19 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 50
+num_epochs = 100
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=5e-5, weight_decay=1e-5)
+optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=2e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-# scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=20000)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
-scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
+# scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
 best_val_loss = float('inf')
 
@@ -593,7 +593,7 @@ else:
 # In[ ]:
 
 
-stepCounter = stepCounter()
+# stepCounter = stepCounter() # use with other schedulers
 
 
 # In[ ]:
@@ -608,9 +608,10 @@ for epoch in training_range:
 
     avg_every = 20
     old_lr = optimizer.param_groups[0]['lr']
-    print(old_lr, stepCounter.steps)
+    # print(old_lr, stepCounter.steps) # use with other schedulers
+    print(old_lr, scheduler.current_step) # use with noam
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, stepCounter)
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates,) # stepCounter) # use with noam
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -639,8 +640,8 @@ for epoch in training_range:
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            # 'scheduler_state_dict': scheduler.__dict__, # use with noam
-            'scheduler_state_dict': scheduler.state_dict(),
+            'scheduler_state_dict': scheduler.__dict__, # use with noam
+            # 'scheduler_state_dict': scheduler.state_dict(), # use with other schedulers
             'best_val_loss': best_val_loss,
         }, save_name)
         save_lists_to_file(save_lists_path, train_losses, val_losses, learning_rates)
@@ -654,8 +655,8 @@ for epoch in training_range:
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            # 'scheduler_state_dict': scheduler.__dict__, # use with noam
-            'scheduler_state_dict': scheduler.state_dict(),
+            'scheduler_state_dict': scheduler.__dict__, # use with noam
+            # 'scheduler_state_dict': scheduler.state_dict(), # use with other schedulers
             'best_val_loss': final_val_loss,
         }, final_save_name)
         save_lists_to_file(final_save_lists, train_losses, val_losses, learning_rates)
