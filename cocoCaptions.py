@@ -161,7 +161,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.1):
+    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.5):
         super().__init__()
 
         self.auto_model = auto_model
