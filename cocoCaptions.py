@@ -343,11 +343,12 @@ class stepCounter:
 
 
 class NoamScheduler:
-    def __init__(self, optimizer, d_model, warmup_steps=4000):
+    def __init__(self, optimizer, d_model, warmup_steps=4000, scaling_factor=1.0):
         self.optimizer = optimizer
         self.d_model = d_model
         self.warmup_steps = warmup_steps
         self.current_step = 0
+        self.scaling_factor = scaling_factor
 
     def step(self):
         self.current_step += 1
@@ -360,47 +361,42 @@ class NoamScheduler:
     def learning_rate(self):
         arg1 = self.current_step ** -0.5
         arg2 = min(self.current_step * self.warmup_steps ** -1.5, 1)
-        return (self.d_model ** -0.5) * min(arg1, arg2)
+        return (self.d_model ** -0.5) * min(arg1, arg2) * self.scaling_factor
 
 
 # In[ ]:
 
 
-def custom_teacher_forcing_scheduler(epoch, max_epochs, initial_teacher_forcing_ratio):
+class TeacherForcingScheduler:
+    def __init__(self, max_epochs, initial_teacher_forcing_ratio=1.0, warmup_steps=4000):
+        self.curr_epoch = 0
+        self.max_epochs = max_epochs
+        self.initial_teacher_forcing_ratio = initial_teacher_forcing_ratio
+        self.curr_teacher_forcing_ratio = initial_teacher_forcing_ratio
+        self.best_val_loss = 0.0
+        self.epochs_since_best_val_loss_set = 0
+        self.warmup_steps = warmup_steps
+        self.tf_history = []
+
+
     # Linear decay
-    linear_decay_ratio = initial_teacher_forcing_ratio * (1 - epoch / max_epochs)
+    def step(self, val_loss, curr_sched_step):
+        self.tf_history.append(self.curr_teacher_forcing_ratio)
 
-    return linear_decay_ratio
+        if val_loss < self.best_val_loss:
+            self.epochs_since_best_val_loss_set = 0
+        elif curr_sched_step > self.warmup_steps:
+            self.epochs_since_best_val_loss_set += 1
+
+        if self.epochs_since_best_val_loss_set <= 2:
+            self.linear_decay()
+
+        self.curr_epoch += 1
 
 
-# In[ ]:
-
-
-# # dummy optimizer for graphing purposes
-# dummy_param = torch.nn.Parameter(torch.zeros(1))
-# optim = optim.Adam([dummy_param], lr=0.0)
-#
-# # Create a NoamScheduler instance
-# d_model = 768
-# warmup_steps = 4000
-# sched = NoamScheduler(optim, d_model, warmup_steps)
-#
-# num_steps = 162*150
-# steps = []
-# learning_rates = []
-#
-# for step in range(1, num_steps + 1):
-#     sched.step()
-#     lr = sched.learning_rate()
-#     steps.append(step)
-#     learning_rates.append(lr)
-#
-# plt.plot(steps, learning_rates)
-# plt.xlabel('Steps')
-# plt.ylabel('Learning Rate')
-# plt.title('Noam Learning Rate Schedule')
-# plt.grid()
-# plt.show()
+    def linear_decay(self):
+        linear_decay_ratio = self.initial_teacher_forcing_ratio * (1 - self.curr_epoch / self.max_epochs)
+        self.curr_teacher_forcing_ratio = linear_decay_ratio
 
 
 # In[ ]:
@@ -496,9 +492,9 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 512
+batch_size = 768
 # num_workers = os.cpu_count()
-num_workers = 4
+num_workers = 8
 print('CPU COUNT:', num_workers)
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
@@ -565,9 +561,12 @@ criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=5e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000, scaling_factor=0.5)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
+
+# tf scheduler
+tf_scheduler = TeacherForcingScheduler(num_epochs)
 
 best_val_loss = float('inf')
 
@@ -590,8 +589,10 @@ if load_best_model and os.path.exists(best_model_path):
 
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scheduler.optimizer = optimizer
-    # scheduler.current_step = checkpoint['scheduler_state_dict']['current_step'] # use with noam
-    scheduler.state_dict = checkpoint['scheduler_state_dict']
+    scheduler.current_step = checkpoint['scheduler_state_dict']['current_step'] # use with noam
+    # scheduler.state_dict = checkpoint['scheduler_state_dict'] # use with other schedulers
+    # tf sched
+    tf_scheduler = checkpoint['tf_scheduler_state_dict']
     best_val_loss = checkpoint['best_val_loss']
     train_losses, val_losses, learning_rates = load_lists_from_file(save_lists_path)
     start_epoch = len(train_losses)
@@ -626,10 +627,7 @@ for epoch in training_range:
     # print(old_lr, stepCounter.steps) # use with other schedulers
     print(old_lr, scheduler.current_step) # use with noam
 
-    teacher_forcing_ratio = custom_teacher_forcing_scheduler(epoch, num_epochs, 1.0)
-    print('TF RATIO:', teacher_forcing_ratio)
-
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=teacher_forcing_ratio) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=tf_scheduler.curr_teacher_forcing_ratio) # stepCounter) # use with other schedulers
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -639,6 +637,13 @@ for epoch in training_range:
     val_loss = evaluate(model, val_data_loader, criterion, device)
     print(f'CURRENT BEST VALIDATION LOSS: {best_val_loss:.4f}')
     print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
+
+    # tf scheduler
+    old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
+    tf_scheduler.step(val_loss, scheduler.current_step)
+    new_tf_ratio = tf_scheduler
+    if old_tf_ratio != new_tf_ratio:
+        print(f'****TF RATIO CHANGED FROM {old_tf_ratio} ==> {new_tf_ratio}****')
 
     train_losses.append(train_loss)
     val_losses.append(val_loss)
@@ -658,6 +663,7 @@ for epoch in training_range:
             'scheduler_state_dict': scheduler.__dict__, # use with noam
             # 'scheduler_state_dict': scheduler.state_dict(), # use with other schedulers
             'best_val_loss': best_val_loss,
+            'tf_scheduler_state_dict': tf_scheduler.__dict__
         }, save_name)
         save_lists_to_file(save_lists_path, train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
@@ -673,6 +679,7 @@ for epoch in training_range:
             'scheduler_state_dict': scheduler.__dict__, # use with noam
             # 'scheduler_state_dict': scheduler.state_dict(), # use with other schedulers
             'best_val_loss': final_val_loss,
+            'tf_scheduler_state_dict': tf_scheduler.__dict__
         }, final_save_name)
         save_lists_to_file(final_save_lists, train_losses, val_losses, learning_rates)
 
