@@ -548,7 +548,7 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=2e-5)
+optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=5e-5)
 
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
 scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=4000)
