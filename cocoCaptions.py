@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import math
@@ -24,7 +24,7 @@ from transformers import AutoTokenizer, AutoModel
 from tqdm import tqdm
 
 
-# In[2]:
+# In[ ]:
 
 
 image_transform = Compose([
@@ -35,7 +35,7 @@ image_transform = Compose([
 ])
 
 
-# In[3]:
+# In[ ]:
 
 
 class CaptionPreprocessor:
@@ -78,7 +78,7 @@ class CaptionPreprocessor:
         return std_dev
 
 
-# In[4]:
+# In[ ]:
 
 
 class CustomCocoDataset(Dataset):
@@ -102,7 +102,7 @@ class CustomCocoDataset(Dataset):
         return img, preprocessed_caption
 
 
-# In[5]:
+# In[ ]:
 
 
 class PatchEmbedding(nn.Module):
@@ -139,7 +139,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-# In[1]:
+# In[ ]:
 
 
 class PositionalEncoding(nn.Module):
@@ -186,7 +186,7 @@ class TransformerCaptionDecoder(nn.Module):
         return logits
 
 
-# In[7]:
+# In[ ]:
 
 
 class ImageCaptioningModel(nn.Module):
@@ -247,7 +247,7 @@ class ImageCaptioningModel(nn.Module):
         return captions_output.squeeze(0).cpu().numpy()
 
 
-# In[8]:
+# In[ ]:
 
 
 def use_teacher_forcing(teacher_forcing_ratio):
@@ -308,19 +308,21 @@ def evaluate(model, dataloader, criterion, device):
     val_loss = 0
     with torch.no_grad():
         for images, captions in tqdm(dataloader, desc='Validating'):
-        # for images, captions in dataloader:
             image = images.to(device)
             captions_input = captions[:, :-1].to(device)
             captions_target = captions[:, 1:].to(device)
 
-            output = model(images, captions_input)
-            loss = criterion(output.reshape(-1, 30522), captions_target.view(-1))
+            output = model(images, captions_input, teacher_forcing=False)
+
+            captions_target = captions[:, 1:-1].to(device)
+            loss = criterion(output[:, 1:].reshape(-1, output.shape[-1]), captions_target.view(-1))
 
             val_loss += loss.item()
     return val_loss / len(dataloader)
 
 
-# In[9]:
+
+# In[ ]:
 
 
 class NoamScheduler:
@@ -344,7 +346,7 @@ class NoamScheduler:
         return (self.d_model ** -0.5) * min(arg1, arg2)
 
 
-# In[10]:
+# In[ ]:
 
 
 # # dummy optimizer for graphing purposes
@@ -374,7 +376,7 @@ class NoamScheduler:
 # plt.show()
 
 
-# In[11]:
+# In[ ]:
 
 
 def plot_and_save(train_losses, val_losses, learning_rates):
@@ -402,7 +404,7 @@ def plot_and_save(train_losses, val_losses, learning_rates):
     fig.savefig('learning_rates.png')
 
 
-# In[12]:
+# In[ ]:
 
 
 def save_lists_to_file(file_path, train_losses, val_losses, learning_rates):
@@ -421,7 +423,7 @@ def load_lists_from_file(file_path):
     return data['train_losses'], data['val_losses'], data['learning_rates']
 
 
-# In[13]:
+# In[ ]:
 
 
 # Needed when running inference on laptop
@@ -433,7 +435,7 @@ def adjust_state_dict_keys(state_dict):
     return new_state_dict
 
 
-# In[14]:
+# In[ ]:
 
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'
@@ -472,7 +474,7 @@ train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuf
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
 
-# In[15]:
+# In[ ]:
 
 
 import numpy as np
@@ -495,7 +497,7 @@ def display_random_sample(dataset, tokenizer):
 # display_random_sample(custom_train_dataset, tokenizer)
 
 
-# In[16]:
+# In[ ]:
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
