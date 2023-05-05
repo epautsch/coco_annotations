@@ -492,7 +492,7 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 768
+batch_size = 640
 # num_workers = os.cpu_count()
 num_workers = 16
 print('CPU COUNT:', num_workers)
