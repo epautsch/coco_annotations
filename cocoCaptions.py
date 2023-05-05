@@ -540,7 +540,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 20
+num_epochs = 50
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -606,7 +606,7 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 50
+    avg_every = 20
     old_lr = optimizer.param_groups[0]['lr']
     print(old_lr, stepCounter.steps)
 
