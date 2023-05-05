@@ -470,8 +470,8 @@ custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, nu
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
 batch_size = 384
-train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
-val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
+train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
+val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
 
 
 # In[ ]:
