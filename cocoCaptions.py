@@ -482,8 +482,9 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 384
-num_workers = os.cpu_count()
+batch_size = 512
+# num_workers = os.cpu_count()
+num_workers = 4
 print('CPU COUNT:', num_workers)
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
@@ -622,9 +623,6 @@ for epoch in training_range:
     print(f'CURRENT BEST VALIDATION LOSS: {best_val_loss:.4f}')
     print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
 
-    epoch_end = time.time()
-    print(f'Epoch {epoch+1}/{num_epochs} total time: {epoch_end - epoch_start}')
-
     train_losses.append(train_loss)
     val_losses.append(val_loss)
 
@@ -660,6 +658,9 @@ for epoch in training_range:
             'best_val_loss': final_val_loss,
         }, final_save_name)
         save_lists_to_file(final_save_lists, train_losses, val_losses, learning_rates)
+
+    epoch_end = time.time()
+    print(f'Epoch {epoch+1}/{num_epochs} total time: {epoch_end - epoch_start}')
 
 training_end = time.time()
 print(f'Total training time: {training_end - training_start}')
