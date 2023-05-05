@@ -535,7 +535,7 @@ caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
-useTwoGPUs = True
+useTwoGPUs = False
 if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
