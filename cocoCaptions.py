@@ -591,6 +591,12 @@ else:
 # In[ ]:
 
 
+stepCounter = stepCounter()
+
+
+# In[ ]:
+
+
 print('**********STARTING TRAINING**********')
 training_start = time.time()
 for epoch in training_range:
@@ -600,7 +606,6 @@ for epoch in training_range:
 
     avg_every = 50
     old_lr = optimizer.param_groups[0]['lr']
-    stepCounter = stepCounter()
     print(old_lr, stepCounter.steps)
 
     train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, stepCounter)
