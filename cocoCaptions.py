@@ -494,7 +494,7 @@ custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_ca
 
 batch_size = 768
 # num_workers = os.cpu_count()
-num_workers = 8
+num_workers = 16
 print('CPU COUNT:', num_workers)
 train_data_loader = DataLoader(custom_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
 val_data_loader = DataLoader(custom_val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
