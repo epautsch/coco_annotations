@@ -540,7 +540,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 50
+num_epochs = 20
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
