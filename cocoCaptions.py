@@ -264,6 +264,7 @@ def train_one_epoch(model,
                     num_epochs,
                     avg_every,
                     learning_rates,
+                    step,
                     teacher_forcing_ratio=0.5):
     torch.autograd.set_detect_anomaly(True)
 
@@ -291,6 +292,7 @@ def train_one_epoch(model,
         learning_rates.append(optimizer.param_groups[0]['lr'])
         optimizer.step()
         scheduler.step()
+        step += 1
 
         train_loss += loss.item()
         last_x_losses.append(loss.item())
@@ -587,9 +589,10 @@ for epoch in training_range:
 
     avg_every = 50
     old_lr = optimizer.param_groups[0]['lr']
-    print(old_lr, scheduler.current_step)
+    step = 0
+    print(old_lr, step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates)
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, step)
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
