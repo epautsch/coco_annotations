@@ -271,7 +271,10 @@ def train_one_epoch(model,
     model.train()
     train_loss = 0
     last_x_losses = []
-    for i, (images, captions) in enumerate(tqdm(dataloader, desc='Training')):
+
+    progress_bar = tqdm(dataloader, desc='Training')
+
+    for i, (images, captions) in enumerate(progress_bar):
         images = images.to(device)
         captions_input = captions.to(device)
 
@@ -299,7 +302,9 @@ def train_one_epoch(model,
 
         if i % avg_every == 0 and i != 0:
             avg_loss = sum(last_x_losses) / len(last_x_losses)
-            print(f'Epoch: {epoch+1}/{num_epochs}, Iteration: {i}, Loss (last {avg_every} iterations): {avg_loss:.4f}')
+
+            progress_bar.set_postfix(avg_loss_last_x_iterations=f'last {avg_every}: {avg_loss:.4f}')
+
             last_x_losses = []
 
     return train_loss / len(dataloader)
