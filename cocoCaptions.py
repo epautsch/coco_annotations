@@ -292,7 +292,7 @@ def train_one_epoch(model,
         learning_rates.append(optimizer.param_groups[0]['lr'])
         optimizer.step()
         scheduler.step()
-        step += 1
+        step.addAstep()
 
         train_loss += loss.item()
         last_x_losses.append(loss.item())
@@ -322,6 +322,17 @@ def evaluate(model, dataloader, criterion, device):
             val_loss += loss.item()
     return val_loss / len(dataloader)
 
+
+
+# In[ ]:
+
+
+class stepCounter:
+    def __init__(self):
+        self.steps = 0
+
+    def addAstep(self):
+        self.steps += 1
 
 
 # In[ ]:
@@ -589,10 +600,10 @@ for epoch in training_range:
 
     avg_every = 50
     old_lr = optimizer.param_groups[0]['lr']
-    step = 0
-    print(old_lr, step)
+    stepCounter = stepCounter()
+    print(old_lr, stepCounter.steps)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, step)
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, stepCounter)
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
