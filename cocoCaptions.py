@@ -366,6 +366,16 @@ class NoamScheduler:
 # In[ ]:
 
 
+def custom_teacher_forcing_scheduler(epoch, max_epochs, initial_teacher_forcing_ratio):
+    # Linear decay
+    linear_decay_ratio = initial_teacher_forcing_ratio * (1 - epoch / max_epochs)
+
+    return linear_decay_ratio
+
+
+# In[ ]:
+
+
 # # dummy optimizer for graphing purposes
 # dummy_param = torch.nn.Parameter(torch.zeros(1))
 # optim = optim.Adam([dummy_param], lr=0.0)
@@ -616,7 +626,10 @@ for epoch in training_range:
     # print(old_lr, stepCounter.steps) # use with other schedulers
     print(old_lr, scheduler.current_step) # use with noam
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates,) # stepCounter) # use with noam
+    teacher_forcing_ratio = custom_teacher_forcing_scheduler(epoch, num_epochs, 1.0)
+    print('TF RATIO:', teacher_forcing_ratio)
+
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=teacher_forcing_ratio) # stepCounter) # use with other schedulers
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
