@@ -373,7 +373,7 @@ class TeacherForcingScheduler:
         self.max_epochs = max_epochs
         self.initial_teacher_forcing_ratio = initial_teacher_forcing_ratio
         self.curr_teacher_forcing_ratio = initial_teacher_forcing_ratio
-        self.best_val_loss = float('inf')
+        self.last_val_loss = float('inf')
         self.epochs_since_best_val_loss_set = 0
         self.warmup_steps = warmup_steps
         self.tf_history = []
@@ -383,12 +383,12 @@ class TeacherForcingScheduler:
     def step(self, val_loss, curr_sched_step):
         self.tf_history.append(self.curr_teacher_forcing_ratio)
 
-        if val_loss < self.best_val_loss:
+        if val_loss < self.last_val_loss:
             self.epochs_since_best_val_loss_set = 0
         elif curr_sched_step > self.warmup_steps:
             self.epochs_since_best_val_loss_set += 1
 
-        if self.epochs_since_best_val_loss_set <= 2:
+        if self.epochs_since_best_val_loss_set < 2:
             self.linear_decay()
 
         self.curr_epoch += 1
@@ -560,13 +560,14 @@ max_iterations = math.ceil(total_samples / batch_size)
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=5e-5)
 
+warmup_steps = 2000
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=2500, scaling_factor=0.35)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, scaling_factor=0.25)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
 # tf scheduler
-tf_scheduler = TeacherForcingScheduler(num_epochs)
+tf_scheduler = TeacherForcingScheduler(num_epochs, warmup_steps=warmup_steps)
 
 best_val_loss = float('inf')
 val_loss = float('inf')
