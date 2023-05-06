@@ -674,8 +674,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'teacher_forcing_attempt_2_FINAL.pt'
-        final_save_lists = 'teacher_forcing_attempt_2_FINAL.pkl'
+        final_save_name = 'larger_attempt_2_FINAL.pt'
+        final_save_lists = 'larger_attempt_2_FINAL.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
