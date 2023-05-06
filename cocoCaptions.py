@@ -161,7 +161,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.6):
+    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.5):
         super().__init__()
 
         self.auto_model = auto_model
@@ -492,7 +492,7 @@ print('Standard deviation of caption length:', std_dev_caption_length)
 custom_train_dataset = CustomCocoDataset(train_dataset, caption_preprocessor, num_captions=5)
 custom_val_dataset = CustomCocoDataset(val_dataset, caption_preprocessor, num_captions=5)
 
-batch_size = 640
+batch_size = 256
 # num_workers = os.cpu_count()
 num_workers = 16
 print('CPU COUNT:', num_workers)
@@ -532,17 +532,17 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=2,
-                                  num_heads=12,
-                                  mlp_dim=512,
+                                  num_layers=6,
+                                  num_heads=16,
+                                  mlp_dim=768,
                                   num_classes=768).to(device)
 
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=2,
-                                            num_heads=12,
-                                            mlp_dim=512).to(device)
+                                            num_layers=6,
+                                            num_heads=16,
+                                            mlp_dim=768).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
@@ -551,7 +551,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 100
+num_epochs = 30
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -578,8 +578,8 @@ learning_rates = []
 
 load_best_model = False
 load_final = False
-best_model_path = 'teacher_forcing_attempt_2.pt'
-save_lists_path = 'teacher_forcing_attempt_2.pkl'
+best_model_path = 'larger_attempt_2.pt'
+save_lists_path = 'larger_attempt_2.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
