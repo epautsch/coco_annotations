@@ -118,7 +118,7 @@ class PatchEmbedding(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    def __init__(self, in_channels, patch_size, embed_dim, num_layers, num_heads, mlp_dim, num_classes, dropout=0.5):
+    def __init__(self, in_channels, patch_size, embed_dim, num_layers, num_heads, mlp_dim, num_classes, dropout=0.4):
         super().__init__()
         self.patch_embed = PatchEmbedding(patch_size, in_channels, embed_dim)
         self.positional_encoding = nn.Parameter(torch.randn(1, (224 // patch_size) * (224 // patch_size) + 1, embed_dim))
@@ -161,7 +161,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.5):
+    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.4):
         super().__init__()
 
         self.auto_model = auto_model
@@ -562,7 +562,7 @@ optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=5e-5)
 
 warmup_steps = 2000
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, scaling_factor=0.075)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, scaling_factor=0.1)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
