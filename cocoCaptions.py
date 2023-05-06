@@ -533,7 +533,7 @@ image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
                                   num_layers=2,
-                                  num_heads=16,
+                                  num_heads=12,
                                   mlp_dim=512,
                                   num_classes=768).to(device)
 
@@ -541,7 +541,7 @@ auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
                                             num_layers=2,
-                                            num_heads=16,
+                                            num_heads=12,
                                             mlp_dim=512).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
@@ -567,7 +567,7 @@ scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, sca
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
 # tf scheduler
-tf_scheduler = TeacherForcingScheduler(num_epochs, warmup_steps=warmup_steps)
+# tf_scheduler = TeacherForcingScheduler(num_epochs, warmup_steps=warmup_steps)
 
 best_val_loss = float('inf')
 val_loss = float('inf')
@@ -630,10 +630,10 @@ for epoch in training_range:
     print(old_lr, scheduler.current_step) # use with noam
 
     # tf scheduler
-    old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
-    tf_scheduler.step(val_loss, scheduler.current_step)
+    # old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
+    # tf_scheduler.step(val_loss, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=tf_scheduler.curr_teacher_forcing_ratio) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.5) # stepCounter) # use with other schedulers
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -645,9 +645,9 @@ for epoch in training_range:
     print(f'VALIDATION LOSS FOR EPOCH {epoch + 1}: {val_loss:.4f}')
 
     # tf scheduler
-    new_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
-    if old_tf_ratio != new_tf_ratio:
-        print(f'****TF RATIO CHANGED FROM {old_tf_ratio} ==> {new_tf_ratio}****')
+    # new_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
+    # if old_tf_ratio != new_tf_ratio:
+    #     print(f'****TF RATIO CHANGED FROM {old_tf_ratio} ==> {new_tf_ratio}****')
 
     train_losses.append(train_loss)
     val_losses.append(val_loss)
@@ -667,7 +667,7 @@ for epoch in training_range:
             'scheduler_state_dict': scheduler.__dict__, # use with noam
             # 'scheduler_state_dict': scheduler.state_dict(), # use with other schedulers
             'best_val_loss': best_val_loss,
-            'tf_scheduler_state_dict': tf_scheduler.__dict__
+            # 'tf_scheduler_state_dict': tf_scheduler.__dict__
         }, save_name)
         save_lists_to_file(save_lists_path, train_losses, val_losses, learning_rates)
         print(f'**********NEW BEST MODEL SAVED @ VAL: {best_val_loss:.4f}**********')
@@ -683,7 +683,7 @@ for epoch in training_range:
             'scheduler_state_dict': scheduler.__dict__, # use with noam
             # 'scheduler_state_dict': scheduler.state_dict(), # use with other schedulers
             'best_val_loss': final_val_loss,
-            'tf_scheduler_state_dict': tf_scheduler.__dict__
+            # 'tf_scheduler_state_dict': tf_scheduler.__dict__
         }, final_save_name)
         save_lists_to_file(final_save_lists, train_losses, val_losses, learning_rates)
 
