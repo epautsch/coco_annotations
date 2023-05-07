@@ -633,7 +633,7 @@ for epoch in training_range:
     # old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     # tf_scheduler.step(val_loss, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.7) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=1.0) # stepCounter) # use with other schedulers
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
