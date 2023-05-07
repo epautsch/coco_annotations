@@ -552,7 +552,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 40
+num_epochs = 60
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -577,10 +577,10 @@ train_losses = []
 val_losses = []
 learning_rates = []
 
-load_best_model = False
-load_final = False
-best_model_path = 'larger_attempt_3.pt'
-save_lists_path = 'larger_attempt_3.pkl'
+load_best_model = True
+load_final = True
+best_model_path = 'larger_attempt_3_FINAL.pt'
+save_lists_path = 'larger_attempt_3_FINAL.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
@@ -655,8 +655,8 @@ for epoch in training_range:
 
     if val_loss < best_val_loss:
         if load_final:
-            save_name = 'larger_model_2.pt'
-            save_lists_path = 'larger_model_2.pkl'
+            save_name = 'larger_attempt_3.pt'
+            save_lists_path = 'larger_attempt_3.pkl'
         else:
             save_name = best_model_path
 
@@ -675,8 +675,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'larger_attempt_3_FINAL.pt'
-        final_save_lists = 'larger_attempt_3_FINAL.pkl'
+        final_save_name = 'larger_attempt_3_FINAL_41_60.pt'
+        final_save_lists = 'larger_attempt_3_FINAL_41_60.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
