@@ -161,7 +161,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.2):
+    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.0):
         super().__init__()
 
         self.auto_model = auto_model
@@ -542,7 +542,8 @@ caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
                                             num_layers=4,
                                             num_heads=16,
-                                            mlp_dim=768).to(device)
+                                            mlp_dim=768,
+                                            dropout=0.1).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
@@ -558,11 +559,11 @@ batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=2e-5)
+optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=2e-6)
 
-warmup_steps = 2000
+warmup_steps = 1000
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, scaling_factor=0.15)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, scaling_factor=0.05)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
