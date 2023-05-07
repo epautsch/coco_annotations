@@ -265,7 +265,7 @@ def train_one_epoch(model,
                     avg_every,
                     learning_rates,
                     stepCounter=None,
-                    teacher_forcing_ratio=0.4):
+                    teacher_forcing_ratio=1.0):
     torch.autograd.set_detect_anomaly(True)
 
     model.train()
@@ -532,7 +532,7 @@ print(device)
 image_encoder = VisionTransformer(in_channels=3,
                                   patch_size=16,
                                   embed_dim=768,
-                                  num_layers=6,
+                                  num_layers=4,
                                   num_heads=16,
                                   mlp_dim=768,
                                   num_classes=768).to(device)
@@ -540,7 +540,7 @@ image_encoder = VisionTransformer(in_channels=3,
 auto_model = AutoModel.from_pretrained(tokenizer_name).to(device)
 caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             d_model=768,
-                                            num_layers=6,
+                                            num_layers=4,
                                             num_heads=16,
                                             mlp_dim=768).to(device)
 
@@ -551,18 +551,18 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 
-num_epochs = 60
+num_epochs = 30
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
 max_iterations = math.ceil(total_samples / batch_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=5e-5)
+optimizer = optim.Adam(model.parameters(), lr=0, weight_decay=2e-5)
 
 warmup_steps = 2000
 # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.67, patience=2, verbose=True)
-scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, scaling_factor=0.1)
+scheduler = NoamScheduler(optimizer, d_model=768, warmup_steps=warmup_steps, scaling_factor=0.15)
 # scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs * max_iterations, eta_min=1e-6)
 # scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=int((num_epochs * max_iterations) / 6.5), T_mult=2, eta_min=1e-6)
 
@@ -576,10 +576,10 @@ train_losses = []
 val_losses = []
 learning_rates = []
 
-load_best_model = True
-load_final = True
-best_model_path = 'larger_attempt_2_FINAL.pt'
-save_lists_path = 'larger_attempt_2_FINAL.pkl'
+load_best_model = False
+load_final = False
+best_model_path = 'larger_attempt_3.pt'
+save_lists_path = 'larger_attempt_3.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
@@ -633,7 +633,7 @@ for epoch in training_range:
     # old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     # tf_scheduler.step(val_loss, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.5) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.7) # stepCounter) # use with other schedulers
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -674,8 +674,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'larger_attempt_2_FINAL.pt'
-        final_save_lists = 'larger_attempt_2_FINAL.pkl'
+        final_save_name = 'larger_attempt_3_FINAL.pt'
+        final_save_lists = 'larger_attempt_3_FINAL.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
