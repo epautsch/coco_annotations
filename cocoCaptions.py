@@ -118,7 +118,7 @@ class PatchEmbedding(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    def __init__(self, in_channels, patch_size, embed_dim, num_layers, num_heads, mlp_dim, num_classes, dropout=0.4):
+    def __init__(self, in_channels, patch_size, embed_dim, num_layers, num_heads, mlp_dim, num_classes, dropout=0.0):
         super().__init__()
         self.patch_embed = PatchEmbedding(patch_size, in_channels, embed_dim)
         self.positional_encoding = nn.Parameter(torch.randn(1, (224 // patch_size) * (224 // patch_size) + 1, embed_dim))
@@ -161,7 +161,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerCaptionDecoder(nn.Module):
-    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.4):
+    def __init__(self, auto_model, d_model, num_layers, num_heads, mlp_dim, dropout=0.2):
         super().__init__()
 
         self.auto_model = auto_model
@@ -624,7 +624,7 @@ for epoch in training_range:
 
     print(f'Total samples: {total_samples}, Batch size: {batch_size}, Maximum iterations: {max_iterations}')
 
-    avg_every = 20
+    avg_every = 50
     old_lr = optimizer.param_groups[0]['lr']
     # print(old_lr, stepCounter.steps) # use with other schedulers
     print(old_lr, scheduler.current_step) # use with noam
