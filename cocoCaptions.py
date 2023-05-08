@@ -228,23 +228,22 @@ class ImageCaptioningModel(nn.Module):
         return captions_output
 
 
-    # used for inference with test dataset
-    def sample(self, model, image, max_length, start_token, device):
-        model.eval()
-
-        with torch.no_grad():
-            image = image.unsqueeze(0).to(device)
-            memory = model.image_encoder(image)
-
-            captions_output = torch.zeros((1, max_length)).long().to(device)
-            captions_output[:, 0] = start_token
-
-            for t in range(1, max_length):
-                captions_input = captions_output[:, :t].to(device)
-                output = model.caption_decoder(captions_input, memory)
-                captions_output[:, t] = output[:, -1].argmax(-1)
-
-        return captions_output.squeeze(0).cpu().numpy()
+    # # used for inference with test dataset
+    # def sample(self, image, max_length, start_token, device):
+    #     self.eval()
+    #     with torch.no_grad():
+    #         image = image.unsqueeze(0).to(device)
+    #         memory = model.image_encoder(image)
+    #
+    #         captions_output = torch.zeros((1, max_length)).long().to(device)
+    #         captions_output[:, 0] = self.start_token_index
+    #
+    #         for t in range(1, max_length):
+    #             captions_input = captions_output[:, :t].to(device)
+    #             output = model.caption_decoder(captions_input, memory)
+    #             captions_output[:, t] = output[:, -1].argmax(-1)
+    #
+    #     return captions_output.squeeze(0).cpu().numpy()
 
 
 # In[ ]:
@@ -551,8 +550,8 @@ useTwoGPUs = True
 if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
-
-num_epochs = 100
+# start newwwwwwww
+num_epochs = 120
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -579,8 +578,8 @@ learning_rates = []
 
 load_best_model = True
 load_final = True
-best_model_path = 'larger_attempt_3_FINAL_61_80.pt'
-save_lists_path = 'larger_attempt_3_FINAL_61_80.pkl'
+best_model_path = 'larger_attempt_3_FINAL_81_100.pt'
+save_lists_path = 'larger_attempt_3_FINAL_81_100.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
@@ -634,7 +633,7 @@ for epoch in training_range:
     # old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     # tf_scheduler.step(val_loss, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=1.0) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.9) # stepCounter) # use with other schedulers
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -675,8 +674,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'larger_attempt_3_FINAL_81_100.pt'
-        final_save_lists = 'larger_attempt_3_FINAL_81_100.pkl'
+        final_save_name = 'larger_attempt_3_FINAL_101_120_tf_0_9.pt'
+        final_save_lists = 'larger_attempt_3_FINAL_101_120_tf_0_9.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
@@ -713,27 +712,49 @@ plot_and_save(train_losses, val_losses, learning_rates)
 # In[ ]:
 
 
-# def generate_caption(model, image, tokenizer, device, max_len=20):
+# def generate_caption(model, image, tokenizer, device, max_len=14):
 #     model.eval()
 #     with torch.no_grad():
 #         image = image.unsqueeze(0).to(device)
-#         generated_caption = model.sample(image, max_len)
-#         decoded_caption = tokenizer.decode(generated_caption.squeeze().tolist(), skip_special_tokens=False)
-#     return decoded_caption
-
-
-# In[ ]:
-
-
-# random_idx = random.randint(0, len(custom_test_dataset) - 1)
-# image, _ = custom_test_dataset[random_idx]
+#         image_features = model.image_encoder(image)
+#         start_token_tensor = torch.tensor([model.start_token_index], dtype=torch.long, device=device)
+#         start_token_embeddings = model.caption_decoder.auto_model.embeddings(start_token_tensor).repeat(image_features.shape[0], 1, 1)
+#         image_features_summed = image_features.sum(dim=1).unsqueeze(1)
+#         image_features_summed = model.image_feature_linear(image_features_summed)
+#         memory = torch.cat([start_token_embeddings, image_features_summed], dim=1)
+#         memory = memory.transpose(0, 1)
 #
-# generated_caption = generate_caption(model, image, tokenizer, device)
+#         captions_output = torch.zeros((1, max_len)).long().to(device)
+#         captions_output[:, 0] = model.start_token_index
+#
+#         for t in range(1, max_len):
+#             captions_input = captions_output[:, :t].to(device)
+#             output = model.caption_decoder(captions_input, memory[:, :t].clone())
+#             captions_output[:, t] = output[:, -1].argmax(-1)
+#
+#         decoded_caption = tokenizer.decode(captions_output.squeeze().tolist(), skip_special_tokens=False)
+#
+#     return decoded_caption
+#
+#
+# def display_image(image, caption_text):
+#     plt.imshow(image)
+#     plt.axis('off')
+#     plt.title(caption_text)
+#     plt.show()
+#
+#
+# inverse_transform = Compose([
+#     Normalize(mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225], std=[1/0.229, 1/0.224, 1/0.225])
+# ])
+#
+# random_idx = random.randint(0, len(custom_test_dataset) - 1)
+# transformed_image, _ = custom_test_dataset[random_idx]
+# generated_caption = generate_caption(model, transformed_image, tokenizer, device)
+#
+# original_image = inverse_transform(transformed_image).permute(1, 2, 0).numpy()
+# original_image = np.clip(original_image, 0, 1)
+#
 # print('Generated caption:', generated_caption)
-
-
-# In[ ]:
-
-
-
+# display_image(original_image, generated_caption)
 
