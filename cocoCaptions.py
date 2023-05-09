@@ -602,7 +602,7 @@ else:
 
 
 new_dropout = True
-new_dropout_rate = 0.2
+new_dropout_rate = 0.5
 if new_dropout:
     if isinstance(model, nn.DataParallel):
         model.module.update_dropout_rate(new_dropout_rate)
