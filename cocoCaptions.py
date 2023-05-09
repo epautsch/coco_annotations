@@ -602,7 +602,7 @@ else:
 
 
 new_dropout = True
-new_dropout_rate = 0.5
+new_dropout_rate = 0.2
 if new_dropout:
     if isinstance(model, nn.DataParallel):
         model.module.update_dropout_rate(new_dropout_rate)
@@ -635,14 +635,14 @@ for epoch in training_range:
     # old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     # tf_scheduler.step(val_loss, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=1.0) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.9) # stepCounter) # use with other schedulers
     # 1-100: 1.0
     # 101-120: 0.9
     # 121-160: 0.8
     # 161-170: 0.9
     # 171-220: 0.7
     # 221-230: 0.6
-    # 231-240: 1.0, decoder dropout: 0.2
+    # 231-240: 0.9; decoder dropout: 0.2
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -683,8 +683,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'larger_attempt_3_FINAL_231_240_tf_1_0_dropOut_0_2.pt'
-        final_save_lists = 'larger_attempt_3_FINAL_231_240_tf_1_0_dropOut_0_2.pkl'
+        final_save_name = 'larger_attempt_3_FINAL_231_240_tf_0_9_dropOut_0_2.pt'
+        final_save_lists = 'larger_attempt_3_FINAL_231_240_tf_0_9_dropOut_0_2.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
