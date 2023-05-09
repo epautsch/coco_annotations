@@ -602,9 +602,12 @@ else:
 
 
 new_dropout = True
+new_dropout_rate = 0.2
 if new_dropout:
-    new_dropout_rate = 0.2
-    model.update_dropout_rate(new_dropout_rate)
+    if isinstance(model, nn.DataParallel):
+        model.module.update_dropout_rate(new_dropout_rate)
+    else:
+        model.update_dropout_rate(new_dropout_rate)
 
 
 # In[ ]:
