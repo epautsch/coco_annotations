@@ -228,22 +228,12 @@ class ImageCaptioningModel(nn.Module):
         return captions_output
 
 
-    # # used for inference with test dataset
-    # def sample(self, image, max_length, start_token, device):
-    #     self.eval()
-    #     with torch.no_grad():
-    #         image = image.unsqueeze(0).to(device)
-    #         memory = model.image_encoder(image)
-    #
-    #         captions_output = torch.zeros((1, max_length)).long().to(device)
-    #         captions_output[:, 0] = self.start_token_index
-    #
-    #         for t in range(1, max_length):
-    #             captions_input = captions_output[:, :t].to(device)
-    #             output = model.caption_decoder(captions_input, memory)
-    #             captions_output[:, t] = output[:, -1].argmax(-1)
-    #
-    #     return captions_output.squeeze(0).cpu().numpy()
+    def update_dropout_rate(self, new_dropout_rate):
+        def update_dropout(module):
+            if isinstance(module, nn.Dropout):
+                module.p = new_dropout_rate
+
+        self.caption_decoder.apply(update_dropout)
 
 
 # In[ ]:
@@ -611,6 +601,15 @@ else:
 # In[ ]:
 
 
+new_dropout = True
+if new_dropout:
+    new_dropout_rate = 0.2
+    model.update_dropout_rate(new_dropout_rate)
+
+
+# In[ ]:
+
+
 # stepCounter = stepCounter() # use with other schedulers
 
 
@@ -681,8 +680,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'larger_attempt_3_FINAL_231_240_tf_1_0_do_0_2.pt'
-        final_save_lists = 'larger_attempt_3_FINAL_231_240_tf_1_0_do_0_2.pkl'
+        final_save_name = 'larger_attempt_3_FINAL_231_240_tf_1_0_dropOut_0_2.pt'
+        final_save_lists = 'larger_attempt_3_FINAL_231_240_tf_1_0_dropOut_0_2.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
