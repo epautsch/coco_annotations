@@ -541,7 +541,7 @@ if torch.cuda.device_count() > 1 and useTwoGPUs:
     print(f'Using {torch.cuda.device_count()} GPUs')
     model = nn.DataParallel(model)
 # start newwwwwwww
-num_epochs = 250
+num_epochs = 270
 
 total_samples = len(train_data_loader.dataset)
 batch_size = train_data_loader.batch_size
@@ -568,8 +568,8 @@ learning_rates = []
 
 load_best_model = True
 load_final = True
-best_model_path = 'larger_attempt_3_FINAL_221_230_tf_0_6.pt'
-save_lists_path = 'larger_attempt_3_FINAL_221_230_tf_0_6.pkl'
+best_model_path = 'larger_attempt_3_FINAL_231_250_tf_0_99_dropOut_0_1.pt'
+save_lists_path = 'larger_attempt_3_FINAL_231_250_tf_0_99_dropOut_0_1.pkl'
 if load_best_model and os.path.exists(best_model_path):
     if torch.cuda.is_available():
         checkpoint = torch.load(best_model_path)
@@ -635,14 +635,15 @@ for epoch in training_range:
     # old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     # tf_scheduler.step(val_loss, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.99) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.98) # stepCounter) # use with other schedulers
     # 1-100: 1.0
     # 101-120: 0.9
     # 121-160: 0.8
     # 161-170: 0.9
     # 171-220: 0.7
     # 221-230: 0.6
-    # 231-240: 0.99; decoder dropout: 0.1
+    # 231-250: 0.99
+    # 251-270: 0.98
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -683,8 +684,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'larger_attempt_3_FINAL_231_250_tf_0_99_dropOut_0_1.pt'
-        final_save_lists = 'larger_attempt_3_FINAL_231_250_tf_0_99_dropOut_0_1.pkl'
+        final_save_name = 'larger_attempt_3_FINAL_251_270_tf_0_98_dropOut_0_1.pt'
+        final_save_lists = 'larger_attempt_3_FINAL_251_270_tf_0_98_dropOut_0_1.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
