@@ -542,7 +542,7 @@ caption_decoder = TransformerCaptionDecoder(auto_model=auto_model,
                                             num_layers=4,
                                             num_heads=16,
                                             mlp_dim=768,
-                                            dropout=0.1).to(device)
+                                            dropout=0.2).to(device)
 
 model = ImageCaptioningModel(image_encoder, caption_decoder).to(device)
 
@@ -633,14 +633,14 @@ for epoch in training_range:
     # old_tf_ratio = tf_scheduler.curr_teacher_forcing_ratio
     # tf_scheduler.step(val_loss, scheduler.current_step)
 
-    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=0.0) # stepCounter) # use with other schedulers
+    train_loss = train_one_epoch(model, train_data_loader, criterion, optimizer, scheduler, device, epoch, num_epochs, avg_every, learning_rates, teacher_forcing_ratio=1.0) # stepCounter) # use with other schedulers
     # 1-100: 1.0
     # 101-120: 0.9
     # 121-160: 0.8
     # 161-170: 0.9
     # 171-220: 0.7
     # 221-230: 0.6
-    # 231-240: 0.0
+    # 231-240: 1.0, decoder dropout: 0.2
     print(f'TRAINING LOSS FOR EPOCH {epoch + 1}: {train_loss:.4f}')
 
     new_lr = optimizer.param_groups[0]['lr']
@@ -681,8 +681,8 @@ for epoch in training_range:
 
     if epoch == num_epochs - 1:
         final_val_loss = best_val_loss
-        final_save_name = 'larger_attempt_3_FINAL_231_240_tf_0_0.pt'
-        final_save_lists = 'larger_attempt_3_FINAL_231_240_tf_0_0.pkl'
+        final_save_name = 'larger_attempt_3_FINAL_231_240_tf_1_0_do_0_2.pt'
+        final_save_lists = 'larger_attempt_3_FINAL_231_240_tf_1_0_do_0_2.pkl'
 
         torch.save({
             'model_state_dict': model.state_dict(),
